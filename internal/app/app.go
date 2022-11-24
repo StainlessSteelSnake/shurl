@@ -19,14 +19,15 @@ type (
 type urlList map[shortURL]longURL
 
 type Server struct {
-	db urlList
+	db      urlList
+	address string
 }
 
 var server *Server
 
 // new Создание локального хранилища для коротких идентификаторов URL
 func newServer() *Server {
-	return &Server{make(urlList)}
+	return &Server{make(urlList), address}
 }
 
 // add Создание короткого идентификатора для URL
@@ -89,7 +90,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Созданный короткий идентификатор URL:", sh)
 
 	w.WriteHeader(http.StatusCreated)
-	_, e = w.Write([]byte(sh))
+	_, e = w.Write([]byte(server.address + "/" + string(sh)))
 	if e != nil {
 		fmt.Println("Ошибка при записи ответа в тело запроса:", e)
 	}
@@ -123,6 +124,6 @@ func Start() {
 
 	// Запускаем HTTP-сервер для обработки входящих запросов
 	http.HandleFunc("/", globalHandler)
-	e := http.ListenAndServe(address, nil)
+	e := http.ListenAndServe(server.address, nil)
 	fmt.Println("Ошибка в работе веб-сервера:", e)
 }
