@@ -90,7 +90,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Созданный короткий идентификатор URL:", sh)
 
 	w.WriteHeader(http.StatusCreated)
-	_, e = w.Write([]byte(server.address + "/" + string(sh)))
+	_, e = w.Write([]byte("http://" + server.address + "/" + string(sh)))
 	if e != nil {
 		fmt.Println("Ошибка при записи ответа в тело запроса:", e)
 	}
