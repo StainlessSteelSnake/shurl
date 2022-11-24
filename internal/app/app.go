@@ -25,7 +25,7 @@ type Server struct {
 var server *Server
 
 // new Создание локального хранилища для коротких идентификаторов URL
-func new() *Server {
+func newServer() *Server {
 	return &Server{make(urlList)}
 }
 
@@ -56,10 +56,13 @@ func (s *Server) find(sh shortURL) (longURL, error) {
 func globalHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "POST":
+		fmt.Println("Пришёл POST-запрос")
 		postHandler(w, r)
 	case "GET":
+		fmt.Println("Пришёл GET-запрос")
 		getHandler(w, r)
 	default:
+		fmt.Println("Пришёл неподдерживаемый запрос", r.Method)
 		w.WriteHeader(http.StatusBadRequest)
 	}
 }
@@ -68,35 +71,44 @@ func globalHandler(w http.ResponseWriter, r *http.Request) {
 func postHandler(w http.ResponseWriter, r *http.Request) {
 	b, e := io.ReadAll(r.Body)
 	if e != nil {
+		fmt.Println("Неверный формат URL")
 		http.Error(w, "неверный формат URL", http.StatusBadRequest)
+
 		return
 	}
 
 	l := longURL(b)
-	fmt.Println("Long URL in request:", l)
+	fmt.Println("Пришедший в запросе исходный URL:", l)
 
 	sh, e := server.add(l)
 	if e != nil {
+		fmt.Println("Ошибка '", e, "' при добавлении в БД URL:", l)
 		http.Error(w, "ошибка при добавлении в БД", http.StatusInternalServerError)
 		return
 	}
-	fmt.Println("Short URL ID in response:", sh)
+	fmt.Println("Созданный короткий идентификатор URL:", sh)
 
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(sh))
+	_, e = w.Write([]byte(sh))
+	if e != nil {
+		fmt.Println("Ошибка при записи ответа в тело запроса:", e)
+	}
 }
 
 // getHandler Обработка входящих GET-запросов на получение исходного URL по его короткому идентификатору
 func getHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Полученный GET-запрос:", r.URL)
+
 	sh := shortURL(strings.Trim(r.URL.Path, "/"))
-	fmt.Println("Short URL ID in request:", sh)
+	fmt.Println("Идентификатор короткого URL, полученный из GET-запроса:", sh)
 
 	l, e := server.find(sh)
 	if e != nil {
-		http.Error(w, "URL с указанным ID не найден", http.StatusBadRequest)
+		fmt.Println("Ошибка '", e, "'. Не найден URL с указанным коротким идентификатором:", sh)
+		http.Error(w, "URL с указанным коротким идентификатором не найден", http.StatusBadRequest)
 		return
 	}
-	fmt.Println("Long URL in response:", l)
+	fmt.Println("Найден URL", l, "для короткого идентификатора", sh)
 
 	//http.Redirect(w, r, string(l), http.StatusTemporaryRedirect)
 
@@ -107,9 +119,10 @@ func getHandler(w http.ResponseWriter, r *http.Request) {
 // Start Запуск веб-сервера для сервиса обработки коротких ссылок
 func Start() {
 	// Создаём экземпляр хранилища коротких URL
-	server = new()
+	server = newServer()
 
 	// Запускаем HTTP-сервер для обработки входящих запросов
 	http.HandleFunc("/", globalHandler)
-	http.ListenAndServe(address, nil)
+	e := http.ListenAndServe(address, nil)
+	fmt.Println("Ошибка в работе веб-сервера:", e)
 }
