@@ -59,6 +59,7 @@ func TestGlobalHandler(t *testing.T) {
 			h(w, request)
 			result := w.Result()
 			assert.Equal(t, tt.want, result.StatusCode)
+			result.Body.Close()
 		})
 	}
 }
@@ -126,6 +127,7 @@ func Test_getHandler(t *testing.T) {
 			result := w.Result()
 			assert.Equal(t, tt.wantCode, result.StatusCode)
 			assert.Equal(t, tt.wantURL, result.Header.Get("Location"))
+			result.Body.Close()
 		})
 	}
 }
