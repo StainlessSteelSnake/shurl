@@ -5,14 +5,7 @@ import (
 )
 
 func TestStart(t *testing.T) {
-	tests := []struct {
-		name string
-	}{}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Log("Started", tt.name)
-		})
-	}
+	t.Skip()
 }
 
 func Test_newServer(t *testing.T) {

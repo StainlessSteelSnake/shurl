@@ -29,9 +29,8 @@ func Start() {
 	s := storage.New(nil)
 
 	// Инициализация обработчика входящих запросов к сервису
-	h := http.HandlerFunc(handlers.GlobalHandler(s, server.host))
-	http.Handle("/", h)
+	h := handlers.GlobalHandler(s)
 
 	// Запуск HTTP-сервера
-	log.Fatal(http.ListenAndServe(server.host, nil))
+	log.Fatal(http.ListenAndServe(server.host, h))
 }

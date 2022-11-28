@@ -2,20 +2,41 @@ package handlers
 
 import (
 	"github.com/StainlessSteelSnake/shurl/internal/storage"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"io"
 	"log"
 	"net/http"
 	"strings"
 )
 
-// postHandler Обработка входящих POST-запросов на создание короткого идентификтора для URL
-func postHandler(s storage.AddFinder, host string, w http.ResponseWriter, r *http.Request) {
+// Handler Обработчик запросов для сервера и ссылка на хранилище URL
+type handler struct {
+	*chi.Mux
+	Storage storage.AddFinder
+}
+
+// NewHandler Создание экземпляра обработчика запросов, со ссылкой на хранилище URL
+func newHandler(s storage.AddFinder) *handler {
+	return &handler{
+		Mux:     chi.NewMux(),
+		Storage: s,
+	}
+}
+
+// badRequest
+func (h *handler) badRequest(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "неподдерживаемый запрос: '"+r.RequestURI+"'", http.StatusBadRequest)
+}
+
+// postLongURL Обработка входящих POST-запросов на создание короткого идентификтора для URL
+func (h *handler) postLongURL(w http.ResponseWriter, r *http.Request) {
+
 	// Считывание содержимого тела POST-запроса
 	b, e := io.ReadAll(r.Body)
 	if e != nil {
 		log.Println("Неверный формат URL")
 		http.Error(w, "неверный формат URL", http.StatusBadRequest)
-
 		return
 	}
 
@@ -30,7 +51,7 @@ func postHandler(s storage.AddFinder, host string, w http.ResponseWriter, r *htt
 	}
 
 	// Сохранение длинной ссылки в хранилище и получение её короткого идентификатора
-	sh, e := s.Add(l)
+	sh, e := h.Storage.Add(l)
 	if e != nil {
 		log.Println("Ошибка '", e, "' при добавлении в БД URL:", l)
 		http.Error(w, "ошибка при добавлении в БД", http.StatusInternalServerError)
@@ -40,14 +61,14 @@ func postHandler(s storage.AddFinder, host string, w http.ResponseWriter, r *htt
 
 	// Формирование ответа: установка кода состояния "успешно создано"
 	w.WriteHeader(http.StatusCreated)
-	_, e = w.Write([]byte("http://" + host + "/" + string(sh)))
+	_, e = w.Write([]byte("http://" + r.Host + "/" + string(sh)))
 	if e != nil {
 		log.Println("Ошибка при записи ответа в тело запроса:", e)
 	}
 }
 
-// getHandler Обработка входящих GET-запросов на получение исходного URL по его короткому идентификатору
-func getHandler(s storage.AddFinder, w http.ResponseWriter, r *http.Request) {
+// getLongURL Обработка входящих GET-запросов на получение исходного URL по его короткому идентификатору
+func (h *handler) getLongURL(w http.ResponseWriter, r *http.Request) {
 	log.Println("Полученный GET-запрос:", r.URL)
 
 	// Получение идентификатора короткой ссылки из URL запроса
@@ -55,7 +76,7 @@ func getHandler(s storage.AddFinder, w http.ResponseWriter, r *http.Request) {
 	log.Println("Идентификатор короткого URL, полученный из GET-запроса:", sh)
 
 	// Поиск длинной ссылки в хранилище по идентификатору короткой ссылки
-	l, e := s.Find(sh)
+	l, e := h.Storage.Find(sh)
 	if e != nil {
 		log.Println("Ошибка '", e, "'. Не найден URL с указанным коротким идентификатором:", sh)
 		http.Error(w, "URL с указанным коротким идентификатором не найден", http.StatusBadRequest)
@@ -71,21 +92,26 @@ func getHandler(s storage.AddFinder, w http.ResponseWriter, r *http.Request) {
 }
 
 // GlobalHandler Обработка всех входящих запросов, вне зависимости от метода
-func GlobalHandler(s storage.AddFinder, host string) func(w http.ResponseWriter, r *http.Request) {
-	// Возвращаем функцию-обработчик для использования сервером
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Определяем метод HTTP и в зависимости от него передаём запрос более узкоспециализированному обработчику
-		switch r.Method {
-		case "POST": // POST-запрос на формирование короткой ссылки
-			log.Println("Пришёл POST-запрос")
-			postHandler(s, host, w, r)
-		case "GET": // GET-запрос на получение длинной ссылки по переданной короткой ссылке
-			log.Println("Пришёл GET-запрос")
-			getHandler(s, w, r)
-		default: // Другие методы, помимо POST и GET, не поддерживаются
-			// Формирование ответа: установка кода состояния "неправильный запрос"
-			log.Println("Пришёл неподдерживаемый запрос", r.Method)
-			w.WriteHeader(http.StatusBadRequest)
-		}
-	}
+func GlobalHandler(s storage.AddFinder) http.Handler {
+	// Создание экземпляр обработчика для последующего использования сервером.
+	// Экзмепляр обработчика содержит в себе ссылку на интерфейс хранилища записей соответствия коротких и полных URL.
+	router := newHandler(s)
+
+	// Использование прослойки для присвоения запросам уникальных идентификаторов
+	router.Use(middleware.RequestID)
+
+	// Использование прослойки для логирования запросов
+	router.Use(middleware.Logger)
+
+	// Использование прослойки для восстановления сервера в случае сбоев (срабатывания паники)
+	router.Use(middleware.Recoverer)
+
+	// Маршрутизация запросов GET и POST. Обработка неподдерживаемых запросов.
+	router.Route("/", func(r chi.Router) {
+		r.Get("/{id}", router.getLongURL)
+		r.Post("/", router.postLongURL)
+		r.MethodNotAllowed(router.badRequest)
+	})
+
+	return router
 }
