@@ -16,20 +16,20 @@ type server struct {
 }
 
 // newServer Получение настроек сервера по-умолчанию
-func newServer() *server {
+func newServer(host string) *server {
 	return &server{host} // Доменное имя и порт сервера по-умолчанию
 }
 
 // Start Запуск веб-сервера для сервиса обработки коротких ссылок
 func Start() {
 	// Получение настройки сервера по-умолчанию
-	server := newServer()
+	server := newServer(host)
 
 	// Получение экземпляра хранилища коротких ссылок
-	storager := storage.New()
+	s := storage.New(nil)
 
 	// Инициализация обработчика входящих запросов к сервису
-	h := http.HandlerFunc(handlers.GlobalHandler(storager, server.host))
+	h := http.HandlerFunc(handlers.GlobalHandler(s, server.host))
 	http.Handle("/", h)
 
 	// Запуск HTTP-сервера

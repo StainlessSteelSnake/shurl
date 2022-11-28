@@ -1,12 +1,12 @@
 package handlers
 
 import (
-	"errors"
-	"fmt"
 	"github.com/StainlessSteelSnake/shurl/internal/storage"
 	"github.com/stretchr/testify/assert"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -21,25 +21,25 @@ func TestGlobalHandler(t *testing.T) {
 	}{
 		{
 			name:    "Неуспешный PUT-запрос",
-			storage: storage.URLList{"asdfg": "https://ya.ru"},
+			storage: storage.URLList{"dummy": "https://ya.ru"},
 			host:    "localhost:8080",
-			request: "localhost:8080/asdfg",
+			request: "localhost:8080/dummy",
 			method:  http.MethodPut,
 			want:    http.StatusBadRequest,
 		},
 		{
-			name:    "Успешный GET-запрос",
-			storage: storage.URLList{"asdfg": "https://ya.ru"},
+			name:    "Неуспешный GET-запрос",
+			storage: storage.URLList{"dummy": "https://ya.ru"},
 			host:    "localhost:8080",
-			request: "localhost:8080/asdfg",
+			request: "localhost:8080/dummy",
 			method:  http.MethodGet,
 			want:    http.StatusBadRequest,
 		},
 		{
 			name:    "Неуспешный POST-запрос",
-			storage: storage.URLList{"asdfg": "https://ya.ru"},
+			storage: storage.URLList{"dummy": "https://ya.ru"},
 			host:    "localhost:8080",
-			request: "localhost:8080/asdfg",
+			request: "localhost:8080/dummy",
 			method:  http.MethodPost,
 			want:    http.StatusBadRequest,
 		},
@@ -47,35 +47,20 @@ func TestGlobalHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := storage.New()
-			for _, ss := range tt.storage {
-				s.Add(ss)
-			}
+			s := storage.New(tt.storage)
 			f := GlobalHandler(s, tt.host)
 
 			request := httptest.NewRequest(tt.method, tt.request, nil)
-			w := httptest.NewRecorder()
+			writer := httptest.NewRecorder()
 			h := http.HandlerFunc(f)
-			h(w, request)
-			result := w.Result()
+			h(writer, request)
+			result := writer.Result()
 			assert.Equal(t, tt.want, result.StatusCode)
-			result.Body.Close()
+			if err := result.Body.Close(); err != nil {
+				t.Fatal(err)
+			}
 		})
 	}
-}
-
-type store storage.URLList
-
-func (s store) Add(l storage.LongURL) (storage.ShortURL, error) {
-	s["asdf"] = l
-	return storage.ShortURL("asdf"), nil
-}
-
-func (s store) Find(sh storage.ShortURL) (storage.LongURL, error) {
-	if l, ok := s[sh]; ok {
-		return l, nil
-	}
-	return "", errors.New("not found")
 }
 
 func Test_getHandler(t *testing.T) {
@@ -87,23 +72,23 @@ func Test_getHandler(t *testing.T) {
 		wantURL  string
 	}{
 		{
-			name:     "Неуспешный запрос",
-			storage:  storage.URLList{"asdf": "https://ya.ru"},
-			request:  "/asdfg",
+			name:     "Неуспешный запрос, ошибка в идентификаторе",
+			storage:  storage.URLList{"dummy": "https://ya.ru"},
+			request:  "/dummy1",
 			wantCode: http.StatusBadRequest,
 			wantURL:  "",
 		},
 		{
-			name:     "Неуспешный запрос",
-			storage:  storage.URLList{"asdf": "https://ya.ru"},
+			name:     "Неуспешный запрос, не передан идентификатор",
+			storage:  storage.URLList{"dummy": "https://ya.ru"},
 			request:  "/",
 			wantCode: http.StatusBadRequest,
 			wantURL:  "",
 		},
 		{
 			name:     "Успешный GET-запрос",
-			storage:  storage.URLList{"asdf": "https://ya.ru"},
-			request:  "/asdf",
+			storage:  storage.URLList{"dummy": "https://ya.ru"},
+			request:  "/dummy",
 			wantCode: http.StatusTemporaryRedirect,
 			wantURL:  "https://ya.ru",
 		},
@@ -111,43 +96,77 @@ func Test_getHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := make(store)
-			for _, l := range tt.storage {
-				s.Add(l)
-			}
-			fmt.Println(s)
+			s := storage.New(tt.storage)
 
-			w := httptest.NewRecorder()
+			writer := httptest.NewRecorder()
 			request := httptest.NewRequest(http.MethodGet, tt.request, nil)
 			h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				getHandler(s, w, r)
 			})
 
-			h(w, request)
-			result := w.Result()
+			h(writer, request)
+			result := writer.Result()
 			assert.Equal(t, tt.wantCode, result.StatusCode)
 			assert.Equal(t, tt.wantURL, result.Header.Get("Location"))
-			result.Body.Close()
+			if err := result.Body.Close(); err != nil {
+				t.Fatal(err)
+			}
 		})
 	}
 }
 
 func Test_postHandler(t *testing.T) {
-	type args struct {
-		storager storage.AddFinder
-		host     string
-		w        http.ResponseWriter
-		r        *http.Request
-	}
 	tests := []struct {
-		name string
-		args args
+		name     string
+		host     string
+		storage  storage.URLList
+		longURL  string
+		wantCode int
+		wantURL  string
 	}{
-		// TODO: Add test cases.
+		{
+			name:     "Успешный запрос",
+			host:     "localhost:8080",
+			storage:  storage.URLList{"dummy": "https://ya.ru"},
+			longURL:  "https://ya.ru",
+			wantCode: http.StatusCreated,
+			wantURL:  "http://localhost:8080/",
+		},
+		{
+			name:     "Неуспешный запрос, в теле не передан URL",
+			host:     "localhost:8080",
+			storage:  storage.URLList{"dummy": "https://ya.ru"},
+			longURL:  "",
+			wantCode: http.StatusBadRequest,
+			wantURL:  "",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			postHandler(tt.args.storager, tt.args.host, tt.args.w, tt.args.r)
+			s := storage.New(tt.storage)
+
+			writer := httptest.NewRecorder()
+			requestBody := strings.NewReader(tt.longURL)
+
+			request := httptest.NewRequest(http.MethodPost, "/", requestBody)
+			h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				postHandler(s, tt.host, writer, request)
+			})
+
+			h(writer, request)
+
+			result := writer.Result()
+			assert.Equal(t, tt.wantCode, result.StatusCode)
+
+			resultBody, err := io.ReadAll(result.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assert.Contains(t, string(resultBody), tt.wantURL)
+
+			if err = result.Body.Close(); err != nil {
+				t.Fatal(err)
+			}
 		})
 	}
 }

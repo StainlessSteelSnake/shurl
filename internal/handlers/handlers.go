@@ -9,7 +9,7 @@ import (
 )
 
 // postHandler Обработка входящих POST-запросов на создание короткого идентификтора для URL
-func postHandler(storager storage.AddFinder, host string, w http.ResponseWriter, r *http.Request) {
+func postHandler(s storage.AddFinder, host string, w http.ResponseWriter, r *http.Request) {
 	// Считывание содержимого тела POST-запроса
 	b, e := io.ReadAll(r.Body)
 	if e != nil {
@@ -30,7 +30,7 @@ func postHandler(storager storage.AddFinder, host string, w http.ResponseWriter,
 	}
 
 	// Сохранение длинной ссылки в хранилище и получение её короткого идентификатора
-	sh, e := storager.Add(l)
+	sh, e := s.Add(l)
 	if e != nil {
 		log.Println("Ошибка '", e, "' при добавлении в БД URL:", l)
 		http.Error(w, "ошибка при добавлении в БД", http.StatusInternalServerError)
@@ -47,7 +47,7 @@ func postHandler(storager storage.AddFinder, host string, w http.ResponseWriter,
 }
 
 // getHandler Обработка входящих GET-запросов на получение исходного URL по его короткому идентификатору
-func getHandler(storager storage.AddFinder, w http.ResponseWriter, r *http.Request) {
+func getHandler(s storage.AddFinder, w http.ResponseWriter, r *http.Request) {
 	log.Println("Полученный GET-запрос:", r.URL)
 
 	// Получение идентификатора короткой ссылки из URL запроса
@@ -55,7 +55,7 @@ func getHandler(storager storage.AddFinder, w http.ResponseWriter, r *http.Reque
 	log.Println("Идентификатор короткого URL, полученный из GET-запроса:", sh)
 
 	// Поиск длинной ссылки в хранилище по идентификатору короткой ссылки
-	l, e := storager.Find(sh)
+	l, e := s.Find(sh)
 	if e != nil {
 		log.Println("Ошибка '", e, "'. Не найден URL с указанным коротким идентификатором:", sh)
 		http.Error(w, "URL с указанным коротким идентификатором не найден", http.StatusBadRequest)
@@ -71,17 +71,17 @@ func getHandler(storager storage.AddFinder, w http.ResponseWriter, r *http.Reque
 }
 
 // GlobalHandler Обработка всех входящих запросов, вне зависимости от метода
-func GlobalHandler(storager storage.AddFinder, host string) func(w http.ResponseWriter, r *http.Request) {
+func GlobalHandler(s storage.AddFinder, host string) func(w http.ResponseWriter, r *http.Request) {
 	// Возвращаем функцию-обработчик для использования сервером
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Определяем метод HTTP и в зависимости от него передаём запрос более узкоспециализированному обработчику
 		switch r.Method {
 		case "POST": // POST-запрос на формирование короткой ссылки
 			log.Println("Пришёл POST-запрос")
-			postHandler(storager, host, w, r)
+			postHandler(s, host, w, r)
 		case "GET": // GET-запрос на получение длинной ссылки по переданной короткой ссылке
 			log.Println("Пришёл GET-запрос")
-			getHandler(storager, w, r)
+			getHandler(s, w, r)
 		default: // Другие методы, помимо POST и GET, не поддерживаются
 			// Формирование ответа: установка кода состояния "неправильный запрос"
 			log.Println("Пришёл неподдерживаемый запрос", r.Method)

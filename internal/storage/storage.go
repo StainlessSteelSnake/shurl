@@ -24,8 +24,12 @@ type AddFinder interface {
 }
 
 // New Создание экземляра хранилища
-func New() AddFinder {
-	return &storage{URLList{}}
+func New(ul URLList) AddFinder {
+	if ul == nil {
+		return &storage{URLList{}}
+	} else {
+		return &storage{ul}
+	}
 }
 
 // Add Добавление длинной ссылки в хранилище и получение идентификатора короткой ссылки

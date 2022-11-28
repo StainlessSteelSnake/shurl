@@ -1,88 +1,116 @@
 package storage
 
 import (
-	"reflect"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestNew(t *testing.T) {
 	tests := []struct {
 		name string
-		want AddFinder
+		UL   URLList
+		want storage
 	}{
-		// TODO: Add test cases.
+		{
+			"Успешный тест, пустой список",
+			nil,
+			storage{URLList{}},
+		},
+		{
+			"Успешный тест, 1 элемент",
+			URLList{"dummy": "http://ya.ru"},
+			storage{URLList{"dummy": "http://ya.ru"}},
+		},
+		{
+			"Успешный тест, 2 элемента",
+			URLList{"dummy": "http://ya.ru", "dummy2": "http://google.ru"},
+			storage{URLList{"dummy": "http://ya.ru", "dummy2": "http://google.ru"}},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := New(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("New() = %v, want %v", got, tt.want)
-			}
+			ul := New(tt.UL)
+			assert.Equal(t, &tt.want, ul)
 		})
 	}
 }
 
 func Test_storage_Add(t *testing.T) {
-	type fields struct {
-		container URLList
-	}
-	type args struct {
-		l LongURL
-	}
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    ShortURL
-		wantErr bool
+		name       string
+		s          storage
+		element    LongURL
+		iterations int
+		err        error
 	}{
-		// TODO: Add test cases.
+		{
+			"Успешное добавление 1 элемента",
+			storage{URLList{}},
+			"http://ya.ru",
+			1,
+			nil,
+		},
+		{
+			"Успешное добавление дублирующих элементов",
+			storage{URLList{}},
+			"http://ya.ru",
+			3,
+			nil,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &storage{
-				container: tt.fields.container,
-			}
-			got, err := s.Add(tt.args.l)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Add() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("Add() got = %v, want %v", got, tt.want)
+			for i := 0; i < 1; i++ {
+				sh, err := tt.s.Add(tt.element)
+				assert.NoError(t, err)
+				assert.NotEmpty(t, sh)
 			}
 		})
 	}
 }
 
 func Test_storage_Find(t *testing.T) {
-	type fields struct {
-		container URLList
-	}
-	type args struct {
-		sh ShortURL
-	}
 	tests := []struct {
 		name    string
-		fields  fields
-		args    args
-		want    LongURL
-		wantErr bool
+		s       storage
+		element ShortURL
+		wantURL LongURL
+		OK      bool
 	}{
-		// TODO: Add test cases.
+		{
+			"Неуспешная попытка поиска в пустом хранилище",
+			storage{URLList{}},
+			"dummy",
+			"",
+			false,
+		},
+		{
+			"Успешная попытка поиска в списке из 1 элемента",
+			storage{URLList{"dummy": "http://ya.ru"}},
+			"dummy",
+			"http://ya.ru",
+			true,
+		},
+		{
+			"Успешная попытка поиска в списке из 3 элементов",
+			storage{URLList{"dummy": "http://ya.ru", "dummy1": "http://mail.ru", "dummy2": "http://google.ru"}},
+			"dummy1",
+			"http://mail.ru",
+			true,
+		},
+		{
+			"Неуспешная попытка поиска в непустом списке",
+			storage{URLList{"dummy": "http://ya.ru"}},
+			"dummy1",
+			"",
+			false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &storage{
-				container: tt.fields.container,
-			}
-			got, err := s.Find(tt.args.sh)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Find() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("Find() got = %v, want %v", got, tt.want)
-			}
+			l, err := tt.s.Find(tt.element)
+			assert.Equal(t, tt.OK, err == nil)
+			assert.Equal(t, tt.wantURL, l)
 		})
 	}
 }
