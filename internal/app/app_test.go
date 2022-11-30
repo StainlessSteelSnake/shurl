@@ -13,17 +13,17 @@ func TestNewServer(t *testing.T) {
 	tests := []struct {
 		name string
 		host string
-		want Server
+		want *Server
 	}{
 		{
 			"Positive case 1",
 			"localhost:8080",
-			Server{Host: "localhost:8080"},
+			&Server{Host: "localhost:8080"},
 		},
 		{
 			"Positive case 2",
 			"127.0.0.1:8888",
-			Server{Host: "127.0.0.1:8888"},
+			&Server{Host: "127.0.0.1:8888"},
 		},
 	}
 	for _, tt := range tests {
