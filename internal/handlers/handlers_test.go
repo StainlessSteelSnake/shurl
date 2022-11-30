@@ -10,10 +10,6 @@ import (
 	"testing"
 )
 
-func Test_newHandler(t *testing.T) {
-	t.Skip()
-}
-
 func Test_handler_badRequest(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -30,7 +26,7 @@ func Test_handler_badRequest(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := newHandler(storage.New(nil))
+			h := handler{Storage: nil}
 
 			request := httptest.NewRequest(tt.method, tt.URL, nil)
 			writer := httptest.NewRecorder()
@@ -46,7 +42,7 @@ func Test_handler_badRequest(t *testing.T) {
 	}
 }
 
-func TestGlobalHandler(t *testing.T) {
+func TestNewHandler(t *testing.T) {
 	tests := []struct {
 		name    string
 		storage storage.URLList
@@ -83,8 +79,8 @@ func TestGlobalHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := storage.New(tt.storage)
-			h := GlobalHandler(s)
+			s := storage.NewStorage(tt.storage)
+			h := NewHandler(s)
 
 			request := httptest.NewRequest(tt.method, tt.request, nil)
 			writer := httptest.NewRecorder()
@@ -133,7 +129,7 @@ func Test_getLongURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := newHandler(storage.New(tt.storage))
+			h := handler{Storage: storage.NewStorage(tt.storage)}
 
 			writer := httptest.NewRecorder()
 			request := httptest.NewRequest(http.MethodGet, tt.request, nil)
@@ -177,7 +173,7 @@ func Test_postLongURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := newHandler(storage.New(tt.storage))
+			h := handler{Storage: storage.NewStorage(tt.storage)}
 
 			writer := httptest.NewRecorder()
 			requestBody := strings.NewReader(tt.longURL)

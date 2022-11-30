@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestNew(t *testing.T) {
+func TestNewStorage(t *testing.T) {
 	tests := []struct {
 		name string
 		UL   URLList
@@ -29,17 +29,17 @@ func TestNew(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ul := New(tt.UL)
+			ul := NewStorage(tt.UL)
 			assert.Equal(t, &tt.want, ul)
 		})
 	}
 }
 
-func Test_storage_Add(t *testing.T) {
+func Test_storage_AddURL(t *testing.T) {
 	tests := []struct {
 		name       string
 		s          storage
-		element    LongURL
+		URL        string
 		iterations int
 		err        error
 	}{
@@ -61,7 +61,7 @@ func Test_storage_Add(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for i := 0; i < 1; i++ {
-				sh, err := tt.s.Add(tt.element)
+				sh, err := tt.s.AddURL(tt.URL)
 				assert.NoError(t, err)
 				assert.NotEmpty(t, sh)
 			}
@@ -69,12 +69,12 @@ func Test_storage_Add(t *testing.T) {
 	}
 }
 
-func Test_storage_Find(t *testing.T) {
+func Test_storage_FindURL(t *testing.T) {
 	tests := []struct {
 		name    string
 		s       storage
-		element ShortURL
-		wantURL LongURL
+		URL     string
+		wantURL string
 		OK      bool
 	}{
 		{
@@ -108,7 +108,7 @@ func Test_storage_Find(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l, err := tt.s.Find(tt.element)
+			l, err := tt.s.FindURL(tt.URL)
 			assert.Equal(t, tt.OK, err == nil)
 			assert.Equal(t, tt.wantURL, l)
 		})
