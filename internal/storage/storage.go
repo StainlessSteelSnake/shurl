@@ -12,12 +12,12 @@ type Storage struct {
 	container urlList
 }
 
-func NewStorage(list *urlList) *Storage {
-	if list != nil && len(*list) > 0 {
-		return &Storage{*list}
+func NewStorage(list urlList) *Storage {
+	if len(list) == 0 {
+		return &Storage{urlList{}}
 	}
 
-	return &Storage{urlList{}}
+	return &Storage{list}
 }
 
 func (s *Storage) AddURL(l string) (string, error) {

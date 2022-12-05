@@ -29,7 +29,7 @@ func TestNewStorage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ul := NewStorage(&tt.UL)
+			ul := NewStorage(tt.UL)
 			assert.Equal(t, &tt.want, ul)
 		})
 	}

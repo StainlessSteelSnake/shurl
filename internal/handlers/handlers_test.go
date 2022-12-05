@@ -79,7 +79,7 @@ func TestNewHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := storage.NewStorage(&tt.storage)
+			s := storage.NewStorage(tt.storage)
 			h := NewHandler(s)
 
 			request := httptest.NewRequest(tt.method, tt.request, nil)
@@ -129,7 +129,7 @@ func Test_getLongURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := handler{storage: storage.NewStorage(&tt.storage)}
+			h := handler{storage: storage.NewStorage(tt.storage)}
 
 			writer := httptest.NewRecorder()
 			request := httptest.NewRequest(http.MethodGet, tt.request, nil)
@@ -173,7 +173,7 @@ func Test_postLongURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := handler{storage: storage.NewStorage(&tt.storage)}
+			h := handler{storage: storage.NewStorage(tt.storage)}
 
 			writer := httptest.NewRecorder()
 			requestBody := strings.NewReader(tt.longURL)

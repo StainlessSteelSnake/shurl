@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"github.com/StainlessSteelSnake/shurl/internal/storage"
 	"github.com/go-chi/chi/v5"
 	"io"
 	"log"
@@ -9,9 +8,14 @@ import (
 	"strings"
 )
 
+type Storage interface {
+	AddURL(l string) (string, error)
+	FindURL(sh string) (string, error)
+}
+
 type handler struct {
 	*chi.Mux
-	storage *storage.Storage
+	storage Storage
 }
 
 func (h *handler) badRequest(w http.ResponseWriter, r *http.Request) {
@@ -70,7 +74,7 @@ func (h *handler) getLongURL(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-func NewHandler(s *storage.Storage) http.Handler {
+func NewHandler(s Storage) http.Handler {
 	handler := &handler{
 		chi.NewMux(),
 		s,

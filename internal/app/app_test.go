@@ -31,7 +31,7 @@ func TestNewServer(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := new(http.Handler)
-			s := NewServer(tt.host, h)
+			s := NewServer(tt.host, *h)
 			require.NotNil(t, s)
 			assert.Equal(t, tt.want.Host, s.Host)
 		})
