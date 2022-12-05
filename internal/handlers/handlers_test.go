@@ -26,7 +26,7 @@ func Test_handler_badRequest(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := handler{storage: nil}
+			h := Handler{storage: nil}
 
 			request := httptest.NewRequest(tt.method, tt.URL, nil)
 			writer := httptest.NewRecorder()
@@ -129,7 +129,7 @@ func Test_getLongURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := handler{storage: storage.NewStorage(tt.storage)}
+			h := Handler{storage: storage.NewStorage(tt.storage)}
 
 			writer := httptest.NewRecorder()
 			request := httptest.NewRequest(http.MethodGet, tt.request, nil)
@@ -173,7 +173,7 @@ func Test_postLongURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := handler{storage: storage.NewStorage(tt.storage)}
+			h := Handler{storage: storage.NewStorage(tt.storage)}
 
 			writer := httptest.NewRecorder()
 			requestBody := strings.NewReader(tt.longURL)

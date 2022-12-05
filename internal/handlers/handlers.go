@@ -13,16 +13,16 @@ type Storage interface {
 	FindURL(sh string) (string, error)
 }
 
-type handler struct {
+type Handler struct {
 	*chi.Mux
 	storage Storage
 }
 
-func (h *handler) badRequest(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) badRequest(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "неподдерживаемый запрос: '"+r.RequestURI+"'", http.StatusBadRequest)
 }
 
-func (h *handler) postLongURL(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) postLongURL(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	b, e := io.ReadAll(r.Body)
@@ -56,7 +56,7 @@ func (h *handler) postLongURL(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *handler) getLongURL(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) getLongURL(w http.ResponseWriter, r *http.Request) {
 	log.Println("Полученный GET-запрос:", r.URL)
 
 	sh := strings.Trim(r.URL.Path, "/")
@@ -74,8 +74,8 @@ func (h *handler) getLongURL(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-func NewHandler(s Storage) http.Handler {
-	handler := &handler{
+func NewHandler(s Storage) *Handler {
+	handler := &Handler{
 		chi.NewMux(),
 		s,
 	}
