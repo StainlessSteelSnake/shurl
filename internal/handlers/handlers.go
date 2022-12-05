@@ -3,7 +3,6 @@ package handlers
 import (
 	"github.com/StainlessSteelSnake/shurl/internal/storage"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"io"
 	"log"
 	"net/http"
@@ -12,11 +11,10 @@ import (
 
 type handler struct {
 	*chi.Mux
-	Storage storage.URLAddFinder
+	storage *storage.Storage
 }
 
 func (h *handler) badRequest(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
 	http.Error(w, "неподдерживаемый запрос: '"+r.RequestURI+"'", http.StatusBadRequest)
 }
 
@@ -39,7 +37,7 @@ func (h *handler) postLongURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sh, e := h.Storage.AddURL(l)
+	sh, e := h.storage.AddURL(l)
 	if e != nil {
 		log.Println("Ошибка '", e, "' при добавлении в БД URL:", l)
 		http.Error(w, "ошибка при добавлении в БД", http.StatusInternalServerError)
@@ -55,14 +53,12 @@ func (h *handler) postLongURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) getLongURL(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
-
 	log.Println("Полученный GET-запрос:", r.URL)
 
 	sh := strings.Trim(r.URL.Path, "/")
 	log.Println("Идентификатор короткого URL, полученный из GET-запроса:", sh)
 
-	l, e := h.Storage.FindURL(sh)
+	l, e := h.storage.FindURL(sh)
 	if e != nil {
 		log.Println("Ошибка '", e, "'. Не найден URL с указанным коротким идентификатором:", sh)
 		http.Error(w, "URL с указанным коротким идентификатором не найден", http.StatusBadRequest)
@@ -74,24 +70,17 @@ func (h *handler) getLongURL(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-func (h *handler) route() {
-	h.Use(middleware.RequestID)
-	h.Use(middleware.Logger)
-	h.Use(middleware.Recoverer)
-
-	h.Route("/", func(r chi.Router) {
-		r.Get("/{id}", h.getLongURL)
-		r.Post("/", h.postLongURL)
-		r.MethodNotAllowed(h.badRequest)
-	})
-}
-
-func NewHandler(s storage.URLAddFinder) http.Handler {
+func NewHandler(s *storage.Storage) http.Handler {
 	handler := &handler{
-		Mux:     chi.NewMux(),
-		Storage: s,
+		chi.NewMux(),
+		s,
 	}
 
-	handler.route()
+	handler.Route("/", func(r chi.Router) {
+		r.Get("/{id}", handler.getLongURL)
+		r.Post("/", handler.postLongURL)
+		r.MethodNotAllowed(handler.badRequest)
+	})
+
 	return handler
 }

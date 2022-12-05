@@ -8,28 +8,28 @@ import (
 func TestNewStorage(t *testing.T) {
 	tests := []struct {
 		name string
-		UL   URLList
-		want storage
+		UL   urlList
+		want Storage
 	}{
 		{
 			"Успешный тест, пустой список",
 			nil,
-			storage{URLList{}},
+			Storage{urlList{}},
 		},
 		{
 			"Успешный тест, 1 элемент",
-			URLList{"dummy": "http://ya.ru"},
-			storage{URLList{"dummy": "http://ya.ru"}},
+			urlList{"dummy": "http://ya.ru"},
+			Storage{urlList{"dummy": "http://ya.ru"}},
 		},
 		{
 			"Успешный тест, 2 элемента",
-			URLList{"dummy": "http://ya.ru", "dummy2": "http://google.ru"},
-			storage{URLList{"dummy": "http://ya.ru", "dummy2": "http://google.ru"}},
+			urlList{"dummy": "http://ya.ru", "dummy2": "http://google.ru"},
+			Storage{urlList{"dummy": "http://ya.ru", "dummy2": "http://google.ru"}},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ul := NewStorage(tt.UL)
+			ul := NewStorage(&tt.UL)
 			assert.Equal(t, &tt.want, ul)
 		})
 	}
@@ -38,21 +38,21 @@ func TestNewStorage(t *testing.T) {
 func Test_storage_AddURL(t *testing.T) {
 	tests := []struct {
 		name       string
-		s          storage
+		s          Storage
 		URL        string
 		iterations int
 		err        error
 	}{
 		{
 			"Успешное добавление 1 элемента",
-			storage{URLList{}},
+			Storage{urlList{}},
 			"http://ya.ru",
 			1,
 			nil,
 		},
 		{
 			"Успешное добавление дублирующих элементов",
-			storage{URLList{}},
+			Storage{urlList{}},
 			"http://ya.ru",
 			3,
 			nil,
@@ -72,35 +72,35 @@ func Test_storage_AddURL(t *testing.T) {
 func Test_storage_FindURL(t *testing.T) {
 	tests := []struct {
 		name    string
-		s       storage
+		s       Storage
 		URL     string
 		wantURL string
 		OK      bool
 	}{
 		{
 			"Неуспешная попытка поиска в пустом хранилище",
-			storage{URLList{}},
+			Storage{urlList{}},
 			"dummy",
 			"",
 			false,
 		},
 		{
 			"Успешная попытка поиска в списке из 1 элемента",
-			storage{URLList{"dummy": "http://ya.ru"}},
+			Storage{urlList{"dummy": "http://ya.ru"}},
 			"dummy",
 			"http://ya.ru",
 			true,
 		},
 		{
 			"Успешная попытка поиска в списке из 3 элементов",
-			storage{URLList{"dummy": "http://ya.ru", "dummy1": "http://mail.ru", "dummy2": "http://google.ru"}},
+			Storage{urlList{"dummy": "http://ya.ru", "dummy1": "http://mail.ru", "dummy2": "http://google.ru"}},
 			"dummy1",
 			"http://mail.ru",
 			true,
 		},
 		{
 			"Неуспешная попытка поиска в непустом списке",
-			storage{URLList{"dummy": "http://ya.ru"}},
+			Storage{urlList{"dummy": "http://ya.ru"}},
 			"dummy1",
 			"",
 			false,

@@ -2,6 +2,8 @@ package app
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"net/http"
 	"testing"
 )
 
@@ -28,7 +30,9 @@ func TestNewServer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := NewServer(tt.host, nil)
+			h := new(http.Handler)
+			s := NewServer(tt.host, h)
+			require.NotNil(t, s)
 			assert.Equal(t, tt.want.Host, s.Host)
 		})
 	}

@@ -6,26 +6,21 @@ import (
 	"time"
 )
 
-type URLList map[string]string
+type urlList = map[string]string
 
-type storage struct {
-	container URLList
+type Storage struct {
+	container urlList
 }
 
-type URLAddFinder interface {
-	AddURL(string) (string, error)
-	FindURL(string) (string, error)
-}
-
-func NewStorage(ul URLList) URLAddFinder {
-	if ul != nil {
-		return &storage{ul}
+func NewStorage(list *urlList) *Storage {
+	if list != nil && len(*list) > 0 {
+		return &Storage{*list}
 	}
 
-	return &storage{URLList{}}
+	return &Storage{urlList{}}
 }
 
-func (s *storage) AddURL(l string) (string, error) {
+func (s *Storage) AddURL(l string) (string, error) {
 	t := time.Now()
 	sh := strconv.FormatInt(t.UnixMicro(), 36)
 
@@ -37,7 +32,7 @@ func (s *storage) AddURL(l string) (string, error) {
 	return sh, nil
 }
 
-func (s *storage) FindURL(sh string) (string, error) {
+func (s *Storage) FindURL(sh string) (string, error) {
 	if l, ok := s.container[sh]; ok {
 		return l, nil
 	}
