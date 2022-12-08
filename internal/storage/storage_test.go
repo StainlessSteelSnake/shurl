@@ -12,21 +12,21 @@ func TestNewStorage(t *testing.T) {
 func Test_storage_AddURL(t *testing.T) {
 	tests := []struct {
 		name       string
-		s          Storager
+		s          Storage
 		URL        string
 		iterations int
 		err        error
 	}{
 		{
 			"Успешное добавление 1 элемента",
-			Storager{map[string]string{}},
+			Storage{map[string]string{}},
 			"http://ya.ru",
 			1,
 			nil,
 		},
 		{
 			"Успешное добавление дублирующих элементов",
-			Storager{map[string]string{}},
+			Storage{map[string]string{}},
 			"http://ya.ru",
 			3,
 			nil,
@@ -46,35 +46,35 @@ func Test_storage_AddURL(t *testing.T) {
 func Test_storage_FindURL(t *testing.T) {
 	tests := []struct {
 		name    string
-		s       Storager
+		s       Storage
 		URL     string
 		wantURL string
 		OK      bool
 	}{
 		{
 			"Неуспешная попытка поиска в пустом хранилище",
-			Storager{map[string]string{}},
+			Storage{map[string]string{}},
 			"dummy",
 			"",
 			false,
 		},
 		{
 			"Успешная попытка поиска в списке из 1 элемента",
-			Storager{map[string]string{"dummy": "http://ya.ru"}},
+			Storage{map[string]string{"dummy": "http://ya.ru"}},
 			"dummy",
 			"http://ya.ru",
 			true,
 		},
 		{
 			"Успешная попытка поиска в списке из 3 элементов",
-			Storager{map[string]string{"dummy": "http://ya.ru", "dummy1": "http://mail.ru", "dummy2": "http://google.ru"}},
+			Storage{map[string]string{"dummy": "http://ya.ru", "dummy1": "http://mail.ru", "dummy2": "http://google.ru"}},
 			"dummy1",
 			"http://mail.ru",
 			true,
 		},
 		{
 			"Неуспешная попытка поиска в непустом списке",
-			Storager{map[string]string{"dummy": "http://ya.ru"}},
+			Storage{map[string]string{"dummy": "http://ya.ru"}},
 			"dummy1",
 			"",
 			false,

@@ -8,17 +8,17 @@ import (
 	"strings"
 )
 
-type Storage interface {
+type Storager interface {
 	AddURL(l string) (string, error)
 	FindURL(sh string) (string, error)
 }
 
 type Handler struct {
 	*chi.Mux
-	storage Storage
+	storage Storager
 }
 
-func NewHandler(s Storage) *Handler {
+func NewHandler(s Storager) *Handler {
 	handler := &Handler{
 		chi.NewMux(),
 		s,

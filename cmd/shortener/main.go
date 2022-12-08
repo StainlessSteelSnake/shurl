@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/StainlessSteelSnake/shurl/internal/app"
 	"github.com/StainlessSteelSnake/shurl/internal/handlers"
+	"github.com/StainlessSteelSnake/shurl/internal/server"
 	"github.com/StainlessSteelSnake/shurl/internal/storage"
 	"log"
 )
@@ -13,6 +13,6 @@ func main() {
 	str := storage.NewStorage()
 	h := handlers.NewHandler(str)
 
-	server := app.NewServer(host, h)
+	server := server.NewServer(host, h)
 	log.Fatal(server.ListenAndServe())
 }

@@ -6,16 +6,16 @@ import (
 	"time"
 )
 
-type Storager struct {
+type Storage struct {
 	container map[string]string
 }
 
-func NewStorage() *Storager {
+func NewStorage() *Storage {
 	list := map[string]string{}
-	return &Storager{list}
+	return &Storage{list}
 }
 
-func (s *Storager) AddURL(l string) (string, error) {
+func (s *Storage) AddURL(l string) (string, error) {
 	t := time.Now()
 	sh := strconv.FormatInt(t.UnixMicro(), 36)
 
@@ -27,7 +27,7 @@ func (s *Storager) AddURL(l string) (string, error) {
 	return sh, nil
 }
 
-func (s *Storager) FindURL(sh string) (string, error) {
+func (s *Storage) FindURL(sh string) (string, error) {
 	if l, ok := s.container[sh]; ok {
 		return l, nil
 	}
