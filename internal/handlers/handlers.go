@@ -18,13 +18,26 @@ type Handler struct {
 	storage Storage
 }
 
+func NewHandler(s Storage) *Handler {
+	handler := &Handler{
+		chi.NewMux(),
+		s,
+	}
+
+	handler.Route("/", func(r chi.Router) {
+		r.Get("/{id}", handler.getLongURL)
+		r.Post("/", handler.postLongURL)
+		r.MethodNotAllowed(handler.badRequest)
+	})
+
+	return handler
+}
+
 func (h *Handler) badRequest(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "неподдерживаемый запрос: '"+r.RequestURI+"'", http.StatusBadRequest)
 }
 
 func (h *Handler) postLongURL(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
-
 	b, e := io.ReadAll(r.Body)
 	if e != nil {
 		log.Println("Неверный формат URL")
@@ -72,19 +85,4 @@ func (h *Handler) getLongURL(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Location", l)
 	w.WriteHeader(http.StatusTemporaryRedirect)
-}
-
-func NewHandler(s Storage) *Handler {
-	handler := &Handler{
-		chi.NewMux(),
-		s,
-	}
-
-	handler.Route("/", func(r chi.Router) {
-		r.Get("/{id}", handler.getLongURL)
-		r.Post("/", handler.postLongURL)
-		r.MethodNotAllowed(handler.badRequest)
-	})
-
-	return handler
 }

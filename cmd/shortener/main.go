@@ -10,7 +10,7 @@ import (
 const host = "localhost:8080"
 
 func main() {
-	str := storage.NewStorage(map[string]string{})
+	str := storage.NewStorage()
 	h := handlers.NewHandler(str)
 
 	server := app.NewServer(host, h)

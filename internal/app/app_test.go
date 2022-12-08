@@ -20,12 +20,12 @@ func TestNewServer(t *testing.T) {
 		{
 			"Positive case 1",
 			"localhost:8080",
-			&Server{Host: "localhost:8080"},
+			&Server{http.Server{Addr: "localhost:8080"}},
 		},
 		{
 			"Positive case 2",
 			"127.0.0.1:8888",
-			&Server{Host: "127.0.0.1:8888"},
+			&Server{http.Server{Addr: "127.0.0.1:8888"}},
 		},
 	}
 	for _, tt := range tests {
@@ -33,7 +33,7 @@ func TestNewServer(t *testing.T) {
 			h := new(http.Handler)
 			s := NewServer(tt.host, *h)
 			require.NotNil(t, s)
-			assert.Equal(t, tt.want.Host, s.Host)
+			assert.Equal(t, tt.want.Addr, s.Addr)
 		})
 	}
 }
