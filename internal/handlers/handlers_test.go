@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"github.com/StainlessSteelSnake/shurl/internal/storage"
+	"errors"
 	"github.com/stretchr/testify/assert"
 	"io"
 	"net/http"
@@ -9,6 +9,22 @@ import (
 	"strings"
 	"testing"
 )
+
+type storage struct {
+	container map[string]string
+}
+
+func (s *storage) AddURL(l string) (string, error) {
+	s.container[l] = l
+	return l, nil
+}
+
+func (s *storage) FindURL(sh string) (string, error) {
+	if l, ok := s.container[sh]; ok {
+		return l, nil
+	}
+	return "", errors.New("короткий URL с ID \" + string(sh) + \" не существует")
+}
 
 func Test_handler_badRequest(t *testing.T) {
 	tests := []struct {
@@ -79,7 +95,7 @@ func TestNewHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := storage.NewStorage(tt.storage)
+			s := &storage{tt.storage}
 			h := NewHandler(s)
 
 			request := httptest.NewRequest(tt.method, tt.request, nil)
@@ -129,7 +145,7 @@ func Test_getLongURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := Handler{storage: storage.NewStorage(tt.storage)}
+			h := Handler{storage: &storage{tt.storage}}
 
 			writer := httptest.NewRecorder()
 			request := httptest.NewRequest(http.MethodGet, tt.request, nil)
@@ -173,7 +189,7 @@ func Test_postLongURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := Handler{storage: storage.NewStorage(tt.storage)}
+			h := Handler{storage: &storage{tt.storage}}
 
 			writer := httptest.NewRecorder()
 			requestBody := strings.NewReader(tt.longURL)
