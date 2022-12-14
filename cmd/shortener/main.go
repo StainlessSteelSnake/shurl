@@ -1,10 +1,11 @@
 package main
 
 import (
+	"log"
+
 	"github.com/StainlessSteelSnake/shurl/internal/handlers"
 	"github.com/StainlessSteelSnake/shurl/internal/server"
 	"github.com/StainlessSteelSnake/shurl/internal/storage"
-	"log"
 )
 
 const host = "localhost:8080"

@@ -2,12 +2,13 @@ package handlers
 
 import (
 	"errors"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type storage struct {
@@ -197,6 +198,83 @@ func Test_postLongURL(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, "/", requestBody)
 			request.Host = tt.host
 			h.postLongURL(writer, request)
+
+			result := writer.Result()
+			assert.Equal(t, tt.wantCode, result.StatusCode)
+
+			resultBody, err := io.ReadAll(result.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assert.Contains(t, string(resultBody), tt.wantURL)
+
+			if err = result.Body.Close(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func Test_postLongURLinJSON(t *testing.T) {
+	tests := []struct {
+		name     string
+		host     string
+		storage  map[string]string
+		longURL  string
+		wantCode int
+		wantURL  string
+	}{
+		{
+			name:     "Успешный запрос",
+			host:     "localhost:8080",
+			storage:  map[string]string{"dummy": "https://ya.ru"},
+			longURL:  `{"url":"https://ya.ru"}`,
+			wantCode: http.StatusCreated,
+			wantURL:  "http://localhost:8080/",
+		},
+		{
+			name:     "Неуспешный запрос, в теле не передан URL",
+			host:     "localhost:8080",
+			storage:  map[string]string{"dummy": "https://ya.ru"},
+			longURL:  ``,
+			wantCode: http.StatusBadRequest,
+			wantURL:  "",
+		},
+		{
+			name:     "Неуспешный запрос, неправильное название поля в JSON",
+			host:     "localhost:8080",
+			storage:  map[string]string{"dummy": "https://ya.ru"},
+			longURL:  `{"URL1":"https://ya.ru"}`,
+			wantCode: http.StatusBadRequest,
+			wantURL:  "",
+		},
+		{
+			name:     "Неуспешный запрос, неправильный формат поля в JSON",
+			host:     "localhost:8080",
+			storage:  map[string]string{"dummy": "https://ya.ru"},
+			longURL:  `{url:"https://ya.ru"}`,
+			wantCode: http.StatusBadRequest,
+			wantURL:  "",
+		},
+		{
+			name:     "Неуспешный запрос, некорректная структура JSON",
+			host:     "localhost:8080",
+			storage:  map[string]string{"dummy": "https://ya.ru"},
+			longURL:  `{"url":"https://ya.ru`,
+			wantCode: http.StatusBadRequest,
+			wantURL:  "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := Handler{storage: &storage{tt.storage}}
+
+			writer := httptest.NewRecorder()
+			requestBody := strings.NewReader(tt.longURL)
+
+			request := httptest.NewRequest(http.MethodPost, "/api/shorten", requestBody)
+			request.Host = tt.host
+			h.postLongURLinJSON(writer, request)
 
 			result := writer.Result()
 			assert.Equal(t, tt.wantCode, result.StatusCode)
