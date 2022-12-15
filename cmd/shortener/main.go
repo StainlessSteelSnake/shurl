@@ -31,6 +31,11 @@ func main() {
 		cfg.BaseURL = "http://" + cfg.ServerAddress + "/"
 	}
 
+	baseURL := []rune(cfg.BaseURL)
+	if baseURL[len(baseURL)-1] != '/' {
+		cfg.BaseURL += "/"
+	}
+
 	str := storage.NewStorage()
 	h := handlers.NewHandler(str, cfg.BaseURL)
 
