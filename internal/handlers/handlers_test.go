@@ -64,6 +64,7 @@ func TestNewHandler(t *testing.T) {
 		name    string
 		storage map[string]string
 		host    string
+		baseURL string
 		request string
 		method  string
 		want    int
@@ -72,6 +73,7 @@ func TestNewHandler(t *testing.T) {
 			name:    "Неуспешный PUT-запрос",
 			storage: map[string]string{"dummy": "https://ya.ru"},
 			host:    "localhost:8080",
+			baseURL: "http://localhost:8080/",
 			request: "localhost:8080/dummy",
 			method:  http.MethodPut,
 			want:    http.StatusBadRequest,
@@ -80,6 +82,7 @@ func TestNewHandler(t *testing.T) {
 			name:    "Неуспешный GET-запрос",
 			storage: map[string]string{"dummy": "https://ya.ru"},
 			host:    "localhost:8080",
+			baseURL: "http://localhost:8080/",
 			request: "localhost:8080/dummy",
 			method:  http.MethodGet,
 			want:    http.StatusBadRequest,
@@ -88,6 +91,7 @@ func TestNewHandler(t *testing.T) {
 			name:    "Неуспешный POST-запрос",
 			storage: map[string]string{"dummy": "https://ya.ru"},
 			host:    "localhost:8080",
+			baseURL: "http://localhost:8080/",
 			request: "localhost:8080/dummy",
 			method:  http.MethodPost,
 			want:    http.StatusBadRequest,
@@ -97,7 +101,7 @@ func TestNewHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &storage{tt.storage}
-			h := NewHandler(s)
+			h := NewHandler(s, tt.baseURL)
 
 			request := httptest.NewRequest(tt.method, tt.request, nil)
 			writer := httptest.NewRecorder()

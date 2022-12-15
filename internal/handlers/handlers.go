@@ -28,9 +28,11 @@ type PostResponseBody struct {
 	Result string `json:"result"`
 }
 
-const protocolPrefix string = "http://"
+var baseURL string
 
-func NewHandler(s Storager) *Handler {
+func NewHandler(s Storager, bURL string) *Handler {
+	baseURL = bURL
+
 	handler := &Handler{
 		chi.NewMux(),
 		s,
@@ -76,7 +78,7 @@ func (h *Handler) postLongURL(w http.ResponseWriter, r *http.Request) {
 	log.Println("Созданный короткий идентификатор URL:", sh)
 
 	w.WriteHeader(http.StatusCreated)
-	_, e = w.Write([]byte(protocolPrefix + r.Host + "/" + sh))
+	_, e = w.Write([]byte(baseURL + sh))
 	if e != nil {
 		log.Println("Ошибка при записи ответа в тело запроса:", e)
 	}
@@ -131,7 +133,7 @@ func (h *Handler) postLongURLinJSON(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Println("Созданный короткий идентификатор URL:", sh)
 
-	response, e := json.Marshal(PostResponseBody{protocolPrefix + r.Host + "/" + sh})
+	response, e := json.Marshal(PostResponseBody{baseURL + sh})
 	if e != nil {
 		log.Println("Ошибка '", e, "' при формировании ответа:", requestBody.URL)
 		http.Error(w, "ошибка при при формировании ответа", http.StatusInternalServerError)

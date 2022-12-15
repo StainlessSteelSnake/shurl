@@ -6,14 +6,24 @@ import (
 	"github.com/StainlessSteelSnake/shurl/internal/handlers"
 	"github.com/StainlessSteelSnake/shurl/internal/server"
 	"github.com/StainlessSteelSnake/shurl/internal/storage"
+	"github.com/caarlos0/env/v6"
 )
 
-const host = "localhost:8080"
+type configuration struct {
+	ServerAddress string `env:"SERVER_ADDRESS,required"`
+	BaseURL       string `env:"BASE_URL,required"`
+}
 
 func main() {
-	str := storage.NewStorage()
-	h := handlers.NewHandler(str)
+	cfg := configuration{}
+	err := env.Parse(&cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	server := server.NewServer(host, h)
-	log.Fatal(server.ListenAndServe())
+	str := storage.NewStorage()
+	h := handlers.NewHandler(str, cfg.BaseURL)
+
+	srv := server.NewServer(cfg.ServerAddress, h)
+	log.Fatal(srv.ListenAndServe())
 }
