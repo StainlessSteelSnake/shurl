@@ -12,8 +12,8 @@ import (
 const serverAddress = "localhost:8080"
 
 type configuration struct {
-	ServerAddress string `env:"SERVER_ADDRESS,required"`
-	BaseURL       string `env:"BASE_URL,required"`
+	ServerAddress string `env:"SERVER_ADDRESS"`
+	BaseURL       string `env:"BASE_URL"`
 }
 
 func main() {
@@ -21,13 +21,14 @@ func main() {
 	err := env.Parse(&cfg)
 	if err != nil {
 		log.Println(err)
-		if cfg.ServerAddress == "" {
-			cfg.ServerAddress = serverAddress
-		}
+	}
 
-		if cfg.BaseURL == "" {
-			cfg.BaseURL = "http://" + cfg.ServerAddress + "/"
-		}
+	if cfg.ServerAddress == "" {
+		cfg.ServerAddress = serverAddress
+	}
+
+	if cfg.BaseURL == "" {
+		cfg.BaseURL = "http://" + cfg.ServerAddress + "/"
 	}
 
 	str := storage.NewStorage()
