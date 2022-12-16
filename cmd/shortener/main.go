@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 
 	"github.com/StainlessSteelSnake/shurl/internal/handlers"
@@ -10,6 +11,8 @@ import (
 )
 
 const serverAddress = "localhost:8080"
+const baseURL = "http://" + serverAddress + "/"
+const fileStoragePath = "shurldb.txt"
 
 type configuration struct {
 	ServerAddress   string `env:"SERVER_ADDRESS"`
@@ -17,11 +20,18 @@ type configuration struct {
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 }
 
-func newConfig() configuration {
-	cfg := configuration{}
-	err := env.Parse(&cfg)
+func newConfiguration() *configuration {
+	cfg := new(configuration)
+
+	flag.StringVar(&cfg.ServerAddress, "a", serverAddress, "string with server address")
+	flag.StringVar(&cfg.BaseURL, "b", baseURL, "string with base URL")
+	flag.StringVar(&cfg.FileStoragePath, "f", fileStoragePath, "string with file storage path")
+	flag.Parse()
+	log.Println("Console flags:", cfg)
+
+	err := env.Parse(cfg)
 	if err != nil {
-		log.Println(err)
+		log.Fatal(err)
 	}
 
 	log.Println("Environment config:", cfg)
@@ -31,7 +41,7 @@ func newConfig() configuration {
 	}
 
 	if cfg.BaseURL == "" {
-		cfg.BaseURL = "http://" + cfg.ServerAddress + "/"
+		cfg.BaseURL = baseURL
 	}
 
 	baseURL := []rune(cfg.BaseURL)
@@ -40,11 +50,12 @@ func newConfig() configuration {
 	}
 
 	log.Println("Resulting config:", cfg)
+
 	return cfg
 }
 
 func main() {
-	cfg := newConfig()
+	cfg := newConfiguration()
 
 	str := storage.NewStorage(cfg.FileStoragePath)
 	defer str.CloseFile()

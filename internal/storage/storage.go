@@ -61,9 +61,9 @@ func (s *Storage) loadFromFile() error {
 		return nil
 	}
 
-	r := Record{}
+	r := new(Record)
 	for s.decoder.More() {
-		err := s.decoder.Decode(&r)
+		err := s.decoder.Decode(r)
 		if err != nil {
 			return err
 		}
@@ -76,7 +76,7 @@ func (s *Storage) loadFromFile() error {
 	return nil
 }
 
-func (s *Storage) saveToFile(r Record) error {
+func (s *Storage) saveToFile(r *Record) error {
 	if s.encoder == nil {
 		return nil
 	}
@@ -111,7 +111,7 @@ func (s *Storage) AddURL(l string) (string, error) {
 
 	s.container[sh] = l
 
-	err := s.saveToFile(Record{sh, l})
+	err := s.saveToFile(&Record{sh, l})
 	if err != nil {
 		return sh, err
 	}
