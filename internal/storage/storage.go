@@ -9,8 +9,6 @@ import (
 	"time"
 )
 
-const filename = "shurldb.txt"
-
 type Storage struct {
 	container map[string]string
 	file      *os.File
