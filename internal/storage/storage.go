@@ -30,7 +30,7 @@ func NewStorage(filePath string) *Storage {
 		return storage
 	}
 
-	err := storage.openFile(filePath + filename)
+	err := storage.openFile(filePath)
 	if err != nil {
 		log.Fatal(err)
 		return storage

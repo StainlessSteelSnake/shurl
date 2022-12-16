@@ -38,13 +38,15 @@ func newConfig() configuration {
 	if baseURL[len(baseURL)-1] != '/' {
 		cfg.BaseURL += "/"
 	}
-
+	/*
 	if cfg.FileStoragePath != "" {
 		fileStoragePath := []rune(cfg.FileStoragePath)
 		if fileStoragePath[len(fileStoragePath)-1] != '/' {
 			cfg.FileStoragePath += "/"
 		}
 	}
+
+	 */
 
 	log.Println("Resulting config:", cfg)
 	return cfg
