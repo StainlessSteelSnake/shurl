@@ -10,6 +10,22 @@ func TestNewStorage(t *testing.T) {
 	t.Skip()
 }
 
+func Test_storage_openFile(t *testing.T) {
+	t.Skip()
+}
+
+func Test_storage_loadFromFile(t *testing.T) {
+	t.Skip()
+}
+
+func Test_storage_saveToFile(t *testing.T) {
+	t.Skip()
+}
+
+func Test_storage_CloseFile(t *testing.T) {
+	t.Skip()
+}
+
 func Test_storage_AddURL(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -20,14 +36,14 @@ func Test_storage_AddURL(t *testing.T) {
 	}{
 		{
 			"Успешное добавление 1 элемента",
-			Storage{map[string]string{}},
+			Storage{map[string]string{}, nil, nil, nil},
 			"http://ya.ru",
 			1,
 			nil,
 		},
 		{
 			"Успешное добавление дублирующих элементов",
-			Storage{map[string]string{}},
+			Storage{map[string]string{}, nil, nil, nil},
 			"http://ya.ru",
 			3,
 			nil,
@@ -54,28 +70,28 @@ func Test_storage_FindURL(t *testing.T) {
 	}{
 		{
 			"Неуспешная попытка поиска в пустом хранилище",
-			Storage{map[string]string{}},
+			Storage{map[string]string{}, nil, nil, nil},
 			"dummy",
 			"",
 			false,
 		},
 		{
 			"Успешная попытка поиска в списке из 1 элемента",
-			Storage{map[string]string{"dummy": "http://ya.ru"}},
+			Storage{map[string]string{"dummy": "http://ya.ru"}, nil, nil, nil},
 			"dummy",
 			"http://ya.ru",
 			true,
 		},
 		{
 			"Успешная попытка поиска в списке из 3 элементов",
-			Storage{map[string]string{"dummy": "http://ya.ru", "dummy1": "http://mail.ru", "dummy2": "http://google.ru"}},
+			Storage{map[string]string{"dummy": "http://ya.ru", "dummy1": "http://mail.ru", "dummy2": "http://google.ru"}, nil, nil, nil},
 			"dummy1",
 			"http://mail.ru",
 			true,
 		},
 		{
 			"Неуспешная попытка поиска в непустом списке",
-			Storage{map[string]string{"dummy": "http://ya.ru"}},
+			Storage{map[string]string{"dummy": "http://ya.ru"}, nil, nil, nil},
 			"dummy1",
 			"",
 			false,

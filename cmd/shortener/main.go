@@ -12,8 +12,9 @@ import (
 const serverAddress = "localhost:8080"
 
 type configuration struct {
-	ServerAddress string `env:"SERVER_ADDRESS"`
-	BaseURL       string `env:"BASE_URL"`
+	ServerAddress   string `env:"SERVER_ADDRESS"`
+	BaseURL         string `env:"BASE_URL"`
+	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 }
 
 func newConfig() configuration {
@@ -38,6 +39,13 @@ func newConfig() configuration {
 		cfg.BaseURL += "/"
 	}
 
+	if cfg.FileStoragePath != "" {
+		fileStoragePath := []rune(cfg.FileStoragePath)
+		if fileStoragePath[len(fileStoragePath)-1] != '/' {
+			cfg.FileStoragePath += "/"
+		}
+	}
+
 	log.Println("Resulting config:", cfg)
 	return cfg
 }
@@ -45,7 +53,9 @@ func newConfig() configuration {
 func main() {
 	cfg := newConfig()
 
-	str := storage.NewStorage()
+	str := storage.NewStorage(cfg.FileStoragePath)
+	defer str.CloseFile()
+
 	h := handlers.NewHandler(str, cfg.BaseURL)
 
 	srv := server.NewServer(cfg.ServerAddress, h)
