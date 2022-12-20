@@ -27,6 +27,18 @@ func (s *storage) FindURL(sh string) (string, error) {
 	return "", errors.New("короткий URL с ID \" + string(sh) + \" не существует")
 }
 
+func TestGzipWriter_Write(t *testing.T) {
+	t.Skip()
+}
+
+func Test_handler_gzipHandler(t *testing.T) {
+	t.Skip()
+}
+
+func Test_decodeRequest(t *testing.T) {
+	t.Skip()
+}
+
 func Test_handler_badRequest(t *testing.T) {
 	tests := []struct {
 		name     string
