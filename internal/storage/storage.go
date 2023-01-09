@@ -31,7 +31,7 @@ type fileStorage struct {
 type Record struct {
 	ShortURL string `json:"short_url"`
 	LongURL  string `json:"long_url"`
-	UserId   string `json:"user_id"`
+	UserID   string `json:"user_id"`
 }
 
 func NewStorage(filePath string) Storager {
@@ -156,10 +156,10 @@ func (s *fileStorage) loadFromFile() error {
 		}
 		s.container[r.ShortURL] = r.LongURL
 
-		if r.UserId == "" {
+		if r.UserID == "" {
 			continue
 		}
-		s.usersURLs[r.UserId] = append(s.usersURLs[r.UserId], r.ShortURL)
+		s.usersURLs[r.UserID] = append(s.usersURLs[r.UserID], r.ShortURL)
 	}
 
 	return nil

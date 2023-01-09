@@ -17,10 +17,10 @@ type user struct {
 }
 
 const secretKey = "TheKey"
-const userIdLength = 5
+const userIDLength = 5
 const cookieUser = "user"
 
-func signId(id string) ([]byte, error) {
+func signID(id string) ([]byte, error) {
 	if id == "" {
 		return nil, errors.New("не задан id пользователя")
 	}
@@ -35,7 +35,7 @@ func signId(id string) ([]byte, error) {
 
 func newUser() (*user, error) {
 	log.Println("Создание нового пользователя")
-	b := make([]byte, userIdLength)
+	b := make([]byte, userIDLength)
 	_, err := rand.Read(b)
 	if err != nil {
 		return nil, err
@@ -46,7 +46,7 @@ func newUser() (*user, error) {
 	u.id = hex.EncodeToString(b)
 	log.Println("Сгенерирован user id:", u.id)
 
-	u.sign, err = signId(u.id)
+	u.sign, err = signID(u.id)
 	if err != nil {
 		return nil, err
 	}
@@ -70,16 +70,16 @@ func (u *user) get(cookie string) error {
 	}
 	log.Println("Cookie расшифрованы в байты:", data)
 
-	id := cookie[:userIdLength*2]
+	id := cookie[:userIDLength*2]
 	log.Println("Извлечён id пользователя из cookie:", id)
 	if id == "" {
 		return errors.New("неправильная длина идентификатора пользователя")
 	}
 
-	signReceived := data[userIdLength:]
+	signReceived := data[userIDLength:]
 	log.Println("Извлечена подпись из cookie:", signReceived)
 
-	signCalculated, err := signId(id)
+	signCalculated, err := signID(id)
 	if err != nil {
 		return err
 	}
