@@ -1,12 +1,15 @@
 package storage
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type Storager interface {
@@ -14,6 +17,7 @@ type Storager interface {
 	AddURL(string, string) (string, error)
 	FindURL(string) (string, error)
 	GetURLsByUser(string) []string
+	Ping() error
 }
 
 type memoryStorage struct {
@@ -28,13 +32,23 @@ type fileStorage struct {
 	encoder *json.Encoder
 }
 
+type databaseStorage struct {
+	*memoryStorage
+	conn *pgx.Conn
+	ctx  context.Context
+}
+
 type Record struct {
 	ShortURL string `json:"short_url"`
 	LongURL  string `json:"long_url"`
 	UserID   string `json:"user_id"`
 }
 
-func NewStorage(filePath string) Storager {
+func NewStorage(filePath string, database string, ctx context.Context) Storager {
+	if database != "" {
+		return newDBStorage(newMemoryStorage(), database, ctx)
+	}
+
 	if filePath == "" {
 		return newMemoryStorage()
 	}
@@ -62,6 +76,18 @@ func newFileStorage(m *memoryStorage, filePath string) *fileStorage {
 	err = storage.loadFromFile()
 	if err != nil {
 		log.Println(err)
+	}
+
+	return storage
+}
+
+func newDBStorage(m *memoryStorage, database string, ctx context.Context) *databaseStorage {
+	storage := &databaseStorage{m, nil, ctx}
+	var err error
+	storage.conn, err = pgx.Connect(ctx, database)
+	if err != nil {
+		log.Println(err)
+		return storage
 	}
 
 	return storage
@@ -108,6 +134,20 @@ func (s *fileStorage) AddURL(l, user string) (string, error) {
 
 func (s *memoryStorage) CloseFunc() func() {
 	return nil
+}
+
+func (s *databaseStorage) CloseFunc() func() {
+	return func() {
+		if s.conn == nil {
+			return
+		}
+
+		err := s.conn.Close(s.ctx)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+	}
 }
 
 func (s *fileStorage) CloseFunc() func() {
@@ -176,4 +216,19 @@ func (s *fileStorage) saveToFile(r *Record) error {
 	}
 
 	return nil
+}
+
+func (s *memoryStorage) Ping() error {
+	return errors.New("БД не была подключена, используется хранилище в памяти")
+}
+
+func (s *fileStorage) Ping() error {
+	return errors.New("БД не была подключена, используется хранилище в файле")
+}
+
+func (s *databaseStorage) Ping() error {
+	if s.conn == nil {
+		return s.memoryStorage.Ping()
+	}
+	return s.conn.Ping(s.ctx)
 }

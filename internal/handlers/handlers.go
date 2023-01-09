@@ -15,6 +15,7 @@ type Storager interface {
 	AddURL(l, user string) (string, error)
 	FindURL(sh string) (string, error)
 	GetURLsByUser(string) []string
+	Ping() error
 }
 
 type Handler struct {
@@ -98,6 +99,7 @@ func NewHandler(s Storager, bURL string) *Handler {
 	handler.Route("/", func(r chi.Router) {
 		r.Get("/{id}", handler.handleCookie(gzipHandler(handler.getLongURL)))
 		r.Get("/api/user/urls", handler.handleCookie(gzipHandler(handler.getLongURLsByUser)))
+		r.Get("/ping", handler.ping)
 		r.Post("/", handler.handleCookie(gzipHandler(handler.postLongURL)))
 		r.Post("/api/shorten", handler.handleCookie(gzipHandler(handler.postLongURLinJSON)))
 		r.MethodNotAllowed(handler.badRequest)
@@ -233,4 +235,15 @@ func (h *Handler) postLongURLinJSON(w http.ResponseWriter, r *http.Request) {
 	if e != nil {
 		log.Println("Ошибка при записи ответа в тело запроса:", e)
 	}
+}
+
+func (h *Handler) ping(w http.ResponseWriter, r *http.Request) {
+	err := h.storage.Ping()
+	if err != nil {
+		log.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }

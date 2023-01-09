@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 
 	"github.com/StainlessSteelSnake/shurl/internal/config"
@@ -12,7 +13,9 @@ import (
 func main() {
 	cfg := config.NewConfiguration()
 
-	str := storage.NewStorage(cfg.FileStoragePath)
+	ctx := context.Background()
+
+	str := storage.NewStorage(cfg.FileStoragePath, cfg.DatabaseDSN, ctx)
 	if closeFunc := str.CloseFunc(); closeFunc != nil {
 		defer closeFunc()
 	}
