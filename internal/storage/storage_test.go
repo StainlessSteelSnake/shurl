@@ -68,20 +68,23 @@ func Test_memoryStorage_AddURL(t *testing.T) {
 		name       string
 		s          memoryStorage
 		URL        string
+		user       string
 		iterations int
 		err        error
 	}{
 		{
 			"Успешное добавление 1 элемента",
-			memoryStorage{map[string]string{}},
+			memoryStorage{map[string]string{}, map[string][]string{}},
 			"http://ya.ru",
+			"1111122222",
 			1,
 			nil,
 		},
 		{
 			"Успешное добавление дублирующих элементов",
-			memoryStorage{map[string]string{}},
+			memoryStorage{map[string]string{}, map[string][]string{}},
 			"http://ya.ru",
+			"3333344444",
 			3,
 			nil,
 		},
@@ -89,7 +92,7 @@ func Test_memoryStorage_AddURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for i := 0; i < 1; i++ {
-				sh, err := tt.s.AddURL(tt.URL)
+				sh, err := tt.s.AddURL(tt.URL, tt.user)
 				assert.NoError(t, err)
 				assert.NotEmpty(t, sh)
 			}
@@ -107,28 +110,28 @@ func Test_memoryStorage_FindURL(t *testing.T) {
 	}{
 		{
 			"Неуспешная попытка поиска в пустом хранилище",
-			memoryStorage{map[string]string{}},
+			memoryStorage{map[string]string{}, map[string][]string{}},
 			"dummy",
 			"",
 			false,
 		},
 		{
 			"Успешная попытка поиска в списке из 1 элемента",
-			memoryStorage{map[string]string{"dummy": "http://ya.ru"}},
+			memoryStorage{map[string]string{"dummy": "http://ya.ru"}, map[string][]string{}},
 			"dummy",
 			"http://ya.ru",
 			true,
 		},
 		{
 			"Успешная попытка поиска в списке из 3 элементов",
-			memoryStorage{map[string]string{"dummy": "http://ya.ru", "dummy1": "http://mail.ru", "dummy2": "http://google.ru"}},
+			memoryStorage{map[string]string{"dummy": "http://ya.ru", "dummy1": "http://mail.ru", "dummy2": "http://google.ru"}, map[string][]string{}},
 			"dummy1",
 			"http://mail.ru",
 			true,
 		},
 		{
 			"Неуспешная попытка поиска в непустом списке",
-			memoryStorage{map[string]string{"dummy": "http://ya.ru"}},
+			memoryStorage{map[string]string{"dummy": "http://ya.ru"}, map[string][]string{}},
 			"dummy1",
 			"",
 			false,
@@ -153,28 +156,28 @@ func Test_fileStorage_AddURL(t *testing.T) {
 	}{
 		{
 			"Неуспешная попытка поиска в пустом хранилище",
-			fileStorage{&memoryStorage{map[string]string{}}, nil, nil, nil},
+			fileStorage{&memoryStorage{map[string]string{}, map[string][]string{}}, nil, nil, nil},
 			"dummy",
 			"",
 			false,
 		},
 		{
 			"Успешная попытка поиска в списке из 1 элемента",
-			fileStorage{&memoryStorage{map[string]string{"dummy": "http://ya.ru"}}, nil, nil, nil},
+			fileStorage{&memoryStorage{map[string]string{"dummy": "http://ya.ru"}, map[string][]string{}}, nil, nil, nil},
 			"dummy",
 			"http://ya.ru",
 			true,
 		},
 		{
 			"Успешная попытка поиска в списке из 3 элементов",
-			fileStorage{&memoryStorage{map[string]string{"dummy": "http://ya.ru", "dummy1": "http://mail.ru", "dummy2": "http://google.ru"}}, nil, nil, nil},
+			fileStorage{&memoryStorage{map[string]string{"dummy": "http://ya.ru", "dummy1": "http://mail.ru", "dummy2": "http://google.ru"}, map[string][]string{}}, nil, nil, nil},
 			"dummy1",
 			"http://mail.ru",
 			true,
 		},
 		{
 			"Неуспешная попытка поиска в непустом списке",
-			fileStorage{&memoryStorage{map[string]string{"dummy": "http://ya.ru"}}, nil, nil, nil},
+			fileStorage{&memoryStorage{map[string]string{"dummy": "http://ya.ru"}, map[string][]string{}}, nil, nil, nil},
 			"dummy1",
 			"",
 			false,

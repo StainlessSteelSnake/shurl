@@ -11,12 +11,14 @@ import (
 
 type Storager interface {
 	CloseFunc() func()
-	AddURL(string) (string, error)
-	FindURL(sh string) (string, error)
+	AddURL(string, string) (string, error)
+	FindURL(string) (string, error)
+	GetURLsByUser(string) []string
 }
 
 type memoryStorage struct {
 	container map[string]string
+	usersURLs map[string][]string
 }
 
 type fileStorage struct {
@@ -29,6 +31,7 @@ type fileStorage struct {
 type Record struct {
 	ShortURL string `json:"short_url"`
 	LongURL  string `json:"long_url"`
+	UserId   string `json:"user_id"`
 }
 
 func NewStorage(filePath string) Storager {
@@ -40,7 +43,7 @@ func NewStorage(filePath string) Storager {
 }
 
 func newMemoryStorage() *memoryStorage {
-	return &memoryStorage{map[string]string{}}
+	return &memoryStorage{map[string]string{}, map[string][]string{}}
 }
 
 func newFileStorage(m *memoryStorage, filePath string) *fileStorage {
@@ -72,7 +75,11 @@ func (s *memoryStorage) FindURL(sh string) (string, error) {
 	return "", errors.New("короткий URL с ID \" + string(sh) + \" не существует")
 }
 
-func (s *memoryStorage) AddURL(l string) (string, error) {
+func (s *memoryStorage) GetURLsByUser(u string) []string {
+	return s.usersURLs[u]
+}
+
+func (s *memoryStorage) AddURL(l, user string) (string, error) {
 	t := time.Now()
 	sh := strconv.FormatInt(t.UnixMicro(), 36)
 
@@ -81,16 +88,17 @@ func (s *memoryStorage) AddURL(l string) (string, error) {
 	}
 
 	s.container[sh] = l
+	s.usersURLs[user] = append(s.usersURLs[user], sh)
 	return sh, nil
 }
 
-func (s *fileStorage) AddURL(l string) (string, error) {
-	sh, err := s.memoryStorage.AddURL(l)
+func (s *fileStorage) AddURL(l, user string) (string, error) {
+	sh, err := s.memoryStorage.AddURL(l, user)
 	if err != nil {
 		return "", err
 	}
 
-	err = s.saveToFile(&Record{sh, l})
+	err = s.saveToFile(&Record{sh, l, user})
 	if err != nil {
 		return sh, err
 	}
@@ -147,6 +155,11 @@ func (s *fileStorage) loadFromFile() error {
 			continue
 		}
 		s.container[r.ShortURL] = r.LongURL
+
+		if r.UserId == "" {
+			continue
+		}
+		s.usersURLs[r.UserId] = append(s.usersURLs[r.UserId], r.ShortURL)
 	}
 
 	return nil

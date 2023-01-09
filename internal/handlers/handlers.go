@@ -12,13 +12,15 @@ import (
 )
 
 type Storager interface {
-	AddURL(l string) (string, error)
+	AddURL(l, user string) (string, error)
 	FindURL(sh string) (string, error)
+	GetURLsByUser(string) []string
 }
 
 type Handler struct {
 	*chi.Mux
 	storage Storager
+	user    *user
 }
 
 type PostRequestBody struct {
@@ -35,6 +37,13 @@ type gzipWriter struct {
 	http.ResponseWriter
 	Writer io.Writer
 }
+
+type shortAndLongURL struct {
+	ShortURL string `json:"short_url"`
+	LongURL  string `json:"original_url"`
+}
+
+type shortAndLongURLs []shortAndLongURL
 
 func (w gzipWriter) Write(b []byte) (int, error) {
 	return w.Writer.Write(b)
@@ -83,12 +92,14 @@ func NewHandler(s Storager, bURL string) *Handler {
 	handler := &Handler{
 		chi.NewMux(),
 		s,
+		new(user),
 	}
 
 	handler.Route("/", func(r chi.Router) {
-		r.Get("/{id}", gzipHandler(handler.getLongURL))
-		r.Post("/", gzipHandler(handler.postLongURL))
-		r.Post("/api/shorten", gzipHandler(handler.postLongURLinJSON))
+		r.Get("/{id}", handler.handleCookie(gzipHandler(handler.getLongURL)))
+		r.Get("/api/user/urls", handler.handleCookie(gzipHandler(handler.getLongURLsByUser)))
+		r.Post("/", handler.handleCookie(gzipHandler(handler.postLongURL)))
+		r.Post("/api/shorten", handler.handleCookie(gzipHandler(handler.postLongURLinJSON)))
 		r.MethodNotAllowed(handler.badRequest)
 	})
 
@@ -117,6 +128,34 @@ func (h *Handler) getLongURL(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
+func (h *Handler) getLongURLsByUser(w http.ResponseWriter, r *http.Request) {
+	log.Println("Полученный GET-запрос:", r.URL)
+
+	urls := h.storage.GetURLsByUser(h.user.id)
+	if len(urls) == 0 {
+		log.Println("Для пользователя с идентификатором '" + h.user.id + "' не найдены сохранённые URL")
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	log.Println("Для пользователя с идентификатором '"+h.user.id+"' найдено ", len(urls), "сохранённых URL:")
+
+	response := make(shortAndLongURLs, 0)
+	for i, short := range urls {
+		long, err := h.storage.FindURL(short)
+		if err != nil {
+			continue
+		}
+
+		record := shortAndLongURL{baseURL + short, long}
+		log.Println("Запись", i, "короткий URL", record.ShortURL, "длинный URL", record.LongURL)
+		response = append(response, record)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	enc := json.NewEncoder(w)
+	enc.Encode(response)
+}
+
 func (h *Handler) postLongURL(w http.ResponseWriter, r *http.Request) {
 	b, e := decodeRequest(r)
 	if e != nil {
@@ -134,7 +173,7 @@ func (h *Handler) postLongURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sh, e := h.storage.AddURL(l)
+	sh, e := h.storage.AddURL(l, h.user.id)
 	if e != nil {
 		log.Println("Ошибка '", e, "' при добавлении в БД URL:", l)
 		http.Error(w, "ошибка при добавлении в БД: "+e.Error(), http.StatusInternalServerError)
@@ -172,7 +211,7 @@ func (h *Handler) postLongURLinJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sh, e := h.storage.AddURL(requestBody.URL)
+	sh, e := h.storage.AddURL(requestBody.URL, h.user.id)
 	if e != nil {
 		log.Println("Ошибка '", e, "' при добавлении в БД URL:", requestBody.URL)
 		http.Error(w, "ошибка при добавлении в БД: "+e.Error(), http.StatusInternalServerError)
