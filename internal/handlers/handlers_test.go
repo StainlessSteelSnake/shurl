@@ -33,6 +33,10 @@ func (s *storage) GetURLsByUser(u string) []string {
 	return s.usersURLs[u]
 }
 
+func (s *storage) Ping() error {
+	return nil
+}
+
 func TestGzipWriter_Write(t *testing.T) {
 	t.Skip()
 }
