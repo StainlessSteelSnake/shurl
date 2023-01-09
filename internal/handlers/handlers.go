@@ -151,6 +151,7 @@ func (h *Handler) getLongURLsByUser(w http.ResponseWriter, r *http.Request) {
 		response = append(response, record)
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	enc := json.NewEncoder(w)
 	enc.Encode(response)
