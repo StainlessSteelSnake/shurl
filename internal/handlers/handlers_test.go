@@ -30,14 +30,7 @@ func (s *storage) FindURL(sh string) (string, error) {
 }
 
 func (s *storage) GetURLsByUser(u string) []string {
-	switch u {
-	case "user1":
-		return []string{"zxcvb"}
-	case "user2":
-		return []string{"asdfg", "qwerty"}
-	default:
-		return []string{}
-	}
+	return s.usersURLs[u]
 }
 
 func TestGzipWriter_Write(t *testing.T) {
@@ -212,8 +205,8 @@ func Test_postLongURL(t *testing.T) {
 		{
 			name:     "Успешный запрос",
 			host:     "localhost:8080",
-			storage:  map[string]string{"dummy": "https://ya.ru"},
-			user:     map[string][]string{"user1": {"https://ya.ru"}},
+			storage:  map[string]string{"dummy1": "https://ya.ru"},
+			user:     map[string][]string{"user1": {"dummy1"}},
 			longURL:  "https://ya.ru",
 			wantCode: http.StatusCreated,
 			wantURL:  "http://localhost:8080/",
@@ -221,8 +214,8 @@ func Test_postLongURL(t *testing.T) {
 		{
 			name:     "Неуспешный запрос, в теле не передан URL",
 			host:     "localhost:8080",
-			storage:  map[string]string{"dummy": "https://ya.ru"},
-			user:     map[string][]string{"user2": {"https://ya.ru"}},
+			storage:  map[string]string{"dummy2": "https://ya.ru"},
+			user:     map[string][]string{"user2": {"dummy2"}},
 			longURL:  "",
 			wantCode: http.StatusBadRequest,
 			wantURL:  "",
@@ -230,7 +223,7 @@ func Test_postLongURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := Handler{storage: &storage{tt.storage, tt.user}}
+			h := Handler{storage: &storage{tt.storage, tt.user}, user: &user{}}
 
 			writer := httptest.NewRecorder()
 			requestBody := strings.NewReader(tt.longURL)
@@ -313,7 +306,7 @@ func Test_postLongURLinJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := Handler{storage: &storage{tt.storage, tt.user}}
+			h := Handler{storage: &storage{tt.storage, tt.user}, user: &user{}}
 
 			writer := httptest.NewRecorder()
 			requestBody := strings.NewReader(tt.longURL)
