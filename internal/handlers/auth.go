@@ -98,6 +98,10 @@ func (u *user) get(cookie string) error {
 
 func (h *Handler) handleCookie(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		h.user.id = ""
+		h.user.sign = []byte{}
+		h.user.cookie = ""
+
 		cookie, err := r.Cookie(cookieUser)
 		if err != nil {
 			log.Println("Cookie '" + cookieUser + "' не переданы")
