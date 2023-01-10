@@ -192,15 +192,25 @@ func (h *Handler) postLongURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var duplicateFound bool
 	sh, e := h.storage.AddURL(l, h.user.id)
 	if e != nil {
-		log.Println("Ошибка '", e, "' при добавлении в БД URL:", l)
-		http.Error(w, "ошибка при добавлении в БД: "+e.Error(), http.StatusInternalServerError)
-		return
+		if !strings.Contains(e.Error(), l) {
+			log.Println("Ошибка '", e, "' при добавлении в БД URL:", l)
+			http.Error(w, "ошибка при добавлении в БД: "+e.Error(), http.StatusInternalServerError)
+			return
+		}
+		duplicateFound = true
 	}
-	log.Println("Созданный короткий идентификатор URL:", sh)
 
-	w.WriteHeader(http.StatusCreated)
+	if duplicateFound {
+		w.WriteHeader(http.StatusConflict)
+		log.Println("Найденный короткий идентификатор URL:", sh)
+	} else {
+		log.Println("Созданный короткий идентификатор URL:", sh)
+		w.WriteHeader(http.StatusCreated)
+	}
+
 	_, e = w.Write([]byte(baseURL + sh))
 	if e != nil {
 		log.Println("Ошибка при записи ответа в тело запроса:", e)
@@ -230,11 +240,16 @@ func (h *Handler) postLongURLinJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var duplicateFound bool
 	sh, e := h.storage.AddURL(requestBody.URL, h.user.id)
 	if e != nil {
-		log.Println("Ошибка '", e, "' при добавлении в БД URL:", requestBody.URL)
-		http.Error(w, "ошибка при добавлении в БД: "+e.Error(), http.StatusInternalServerError)
-		return
+
+		if !strings.Contains(e.Error(), requestBody.URL) {
+			log.Println("Ошибка '", e, "' при добавлении в БД URL:", requestBody.URL)
+			http.Error(w, "ошибка при добавлении в БД: "+e.Error(), http.StatusInternalServerError)
+			return
+		}
+		duplicateFound = true
 	}
 	log.Println("Созданный короткий идентификатор URL:", sh)
 
@@ -246,7 +261,12 @@ func (h *Handler) postLongURLinJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+
+	if duplicateFound {
+		w.WriteHeader(http.StatusConflict)
+	} else {
+		w.WriteHeader(http.StatusCreated)
+	}
 	_, e = w.Write(response)
 	if e != nil {
 		log.Println("Ошибка при записи ответа в тело запроса:", e)

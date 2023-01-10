@@ -2,8 +2,12 @@ package storage
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"github.com/jackc/pgx/v5/pgconn"
 	"log"
 
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -20,12 +24,17 @@ const (
 			long_url character varying COLLATE pg_catalog."default" NOT NULL,
 			user_id character varying COLLATE pg_catalog."default",
 			CONSTRAINT short_urls_pkey PRIMARY KEY (short_url)
-		)
-		
-	TABLESPACE pg_default;`
+		)	
+	TABLESPACE pg_default;
+
+	CREATE UNIQUE INDEX IF NOT EXISTS unique_long_url
+    ON public.short_urls USING btree
+    (long_url COLLATE pg_catalog."default" ASC NULLS LAST)
+    TABLESPACE pg_default;
+`
 
 	querySelectAll = `
-	SELECT short_url, long_url, user_id from short_urls`
+	SELECT short_url, long_url, user_id FROM short_urls`
 
 	txPreparedName = "shurl-insert"
 )
@@ -83,6 +92,22 @@ func (s *databaseStorage) init() error {
 	return nil
 }
 
+type StorageDBError struct {
+	LongURL string
+	Err     error
+}
+
+func (e *StorageDBError) Error() string {
+	return fmt.Sprintf("Найден дубликат для полного URL: %v. Ошибка добавления в БД: %v", e.LongURL, e.Err)
+}
+
+func NewStorageDBError(longURL string, err error) error {
+	return &StorageDBError{
+		LongURL: longURL,
+		Err:     err,
+	}
+}
+
 func (s *databaseStorage) AddURL(l, user string) (string, error) {
 	sh, err := s.memoryStorage.AddURL(l, user)
 	if err != nil {
@@ -91,7 +116,27 @@ func (s *databaseStorage) AddURL(l, user string) (string, error) {
 
 	ct, err := s.conn.Exec(s.ctx, queryInsert, sh, l, user)
 	if err != nil {
-		return "", err
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) {
+			return "", err
+		}
+		//pgErr, ok := err.(*pgconn.PgError)
+		log.Println("Ошибка операции с БД, код:", pgErr.Code, ", сообщение:", pgErr.Error())
+
+		if pgErr.Code != pgerrcode.UniqueViolation {
+			return "", err
+		}
+
+		duplicateErr := NewStorageDBError(l, err)
+
+		r := s.conn.QueryRow(s.ctx, "SELECT short_url FROM short_urls WHERE long_url = $1", l)
+		err = r.Scan(&sh)
+		if err != nil {
+			return "", NewStorageDBError(l, err)
+		}
+
+		log.Println("Найдена ранее сохранённая запись")
+		return sh, duplicateErr
 	}
 
 	log.Println("Добавлено строк:", ct.RowsAffected())
