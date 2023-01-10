@@ -23,7 +23,7 @@ func (c *Configuration) fillFromFlags() {
 	flag.StringVar(&c.ServerAddress, "a", serverAddress, "string with server address")
 	flag.StringVar(&c.BaseURL, "b", baseURL, "string with base URL")
 	flag.StringVar(&c.FileStoragePath, "f", fileStoragePath, "string with file storage path")
-	flag.StringVar(&c.DatabaseDSN, "d", databaseDSN, "string with database data source name")
+	flag.StringVar(&c.DatabaseDSN, "d", "", "string with database data source name")
 
 	flag.Parse()
 
@@ -62,10 +62,6 @@ func NewConfiguration() *Configuration {
 	baseURL := []rune(cfg.BaseURL)
 	if baseURL[len(baseURL)-1] != '/' {
 		cfg.BaseURL += "/"
-	}
-
-	if cfg.DatabaseDSN == "" {
-		cfg.DatabaseDSN = databaseDSN
 	}
 
 	log.Println("Resulting config:", cfg)

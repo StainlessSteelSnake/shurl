@@ -90,7 +90,56 @@ func newDBStorage(m *memoryStorage, database string, ctx context.Context) *datab
 		return storage
 	}
 
+	err = storage.init()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	return storage
+}
+
+func (s *databaseStorage) init() error {
+	queryCreate := `
+	CREATE TABLE IF NOT EXISTS public.short_urls
+		(
+			short_url character varying(10) COLLATE pg_catalog."default" NOT NULL,
+			long_url character varying COLLATE pg_catalog."default" NOT NULL,
+			"user" character varying COLLATE pg_catalog."default",
+			CONSTRAINT short_urls_pkey PRIMARY KEY (short_url)
+		)
+		
+	TABLESPACE pg_default;`
+
+	_, err := s.conn.Exec(s.ctx, queryCreate)
+	if err != nil {
+		return err
+	}
+
+	querySelect := `
+	SELECT short_url, long_url, "user" from short_urls
+`
+
+	rows, err := s.conn.Query(s.ctx, querySelect)
+	if err != nil {
+		return err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var sh, l, u string
+		rows.Scan(&sh, &l, &u)
+		s.memoryStorage.container[sh] = l
+		s.memoryStorage.usersURLs[u] = append(s.memoryStorage.usersURLs[u], sh)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return err
+	}
+
+	log.Println("Таблицы успешно инициализированы в БД")
+	return nil
 }
 
 func (s *memoryStorage) FindURL(sh string) (string, error) {
@@ -129,6 +178,26 @@ func (s *fileStorage) AddURL(l, user string) (string, error) {
 		return sh, err
 	}
 
+	return sh, nil
+}
+
+func (s *databaseStorage) AddURL(l, user string) (string, error) {
+	sh, err := s.memoryStorage.AddURL(l, user)
+	if err != nil {
+		return "", err
+	}
+
+	query := `
+	INSERT INTO public.short_urls(
+	short_url, long_url, "user")
+	VALUES ($1, $2, $3);`
+
+	ct, err := s.conn.Exec(s.ctx, query, sh, l, user)
+	if err != nil {
+		return "", err
+	}
+
+	log.Println("Добавлено строк:", ct.RowsAffected())
 	return sh, nil
 }
 
