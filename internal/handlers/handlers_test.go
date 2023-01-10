@@ -37,6 +37,15 @@ func (s *storage) Ping() error {
 	return nil
 }
 
+func (s *storage) AddURLs(b [][2]string, user string) ([][2]string, error) {
+	for _, record := range b {
+		s.container[record[1]] = record[1]
+		s.usersURLs[user] = append(s.usersURLs[user], record[1])
+
+	}
+	return b, nil
+}
+
 func TestGzipWriter_Write(t *testing.T) {
 	t.Skip()
 }

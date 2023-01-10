@@ -13,6 +13,7 @@ import (
 
 type Storager interface {
 	AddURL(l, user string) (string, error)
+	AddURLs([][2]string, string) ([][2]string, error)
 	FindURL(sh string) (string, error)
 	GetURLsByUser(string) []string
 	Ping() error
@@ -31,6 +32,20 @@ type PostRequestBody struct {
 type PostResponseBody struct {
 	Result string `json:"result"`
 }
+
+type PostRequestRecord struct {
+	ID  string `json:"correlation_id"`
+	URL string `json:"original_url"`
+}
+
+type PostResponseRecord struct {
+	ID       string `json:"correlation_id"`
+	ShortURL string `json:"short_url"`
+}
+
+type PostRequestBatch []PostRequestRecord
+
+type PostResponseBatch []PostResponseRecord
 
 var baseURL string
 
@@ -102,6 +117,7 @@ func NewHandler(s Storager, bURL string) *Handler {
 		r.Get("/ping", handler.ping)
 		r.Post("/", handler.handleCookie(gzipHandler(handler.postLongURL)))
 		r.Post("/api/shorten", handler.handleCookie(gzipHandler(handler.postLongURLinJSON)))
+		r.Post("/api/shorten/batch", handler.handleCookie(gzipHandler(handler.postLongURLinJSONbatch)))
 		r.MethodNotAllowed(handler.badRequest)
 	})
 
@@ -246,4 +262,59 @@ func (h *Handler) ping(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) postLongURLinJSONbatch(w http.ResponseWriter, r *http.Request) {
+	b, e := decodeRequest(r)
+	if e != nil {
+		log.Println("Неверный формат данных в запросе:", e)
+		http.Error(w, "неверный формат данных в запросе: "+e.Error(), http.StatusBadRequest)
+		return
+	}
+
+	requestBody := PostRequestBatch{}
+	e = json.Unmarshal(b, &requestBody)
+	if e != nil {
+		log.Println("Неверный формат данных в запросе:", e)
+		http.Error(w, "неверный формат данных в запросе: "+e.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if len(requestBody) == 0 {
+		log.Println("Пустой список URL")
+		http.Error(w, "пустой список URL", http.StatusBadRequest)
+		return
+	}
+
+	var longURLs = make([][2]string, 0, len(requestBody))
+	for _, requestRecord := range requestBody {
+		longURLs = append(longURLs, [2]string{requestRecord.ID, requestRecord.URL})
+	}
+
+	shortURLs, e := h.storage.AddURLs(longURLs, h.user.id)
+	if e != nil {
+		log.Println("Ошибка '", e, "' при добавлении в БД URLs:", longURLs)
+		http.Error(w, "ошибка при добавлении в БД URLs: "+e.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var responseBody = make(PostResponseBatch, 0, len(shortURLs))
+	for _, shortURL := range shortURLs {
+		responseRecord := PostResponseRecord{ID: shortURL[0], ShortURL: baseURL + shortURL[1]}
+		responseBody = append(responseBody, responseRecord)
+	}
+
+	response, e := json.Marshal(responseBody)
+	if e != nil {
+		log.Println("Ошибка '", e, "' при формировании ответа:", responseBody)
+		http.Error(w, "ошибка при при формировании ответа: "+e.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_, e = w.Write(response)
+	if e != nil {
+		log.Println("Ошибка при записи ответа в тело запроса:", e)
+	}
 }
