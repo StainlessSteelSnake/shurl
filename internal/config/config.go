@@ -19,28 +19,6 @@ type Configuration struct {
 	DatabaseDSN     string `env:"DATABASE_DSN"`
 }
 
-func (c *Configuration) fillFromFlags() {
-	flag.StringVar(&c.ServerAddress, "a", serverAddress, "string with server address")
-	flag.StringVar(&c.BaseURL, "b", baseURL, "string with base URL")
-	flag.StringVar(&c.FileStoragePath, "f", fileStoragePath, "string with file storage path")
-	flag.StringVar(&c.DatabaseDSN, "d", "", "string with database data source name")
-
-	flag.Parse()
-
-	log.Println("Console flags:", c)
-}
-
-func (c *Configuration) fillFromEnvironment() error {
-	err := env.Parse(c)
-	if err != nil {
-		return err
-	}
-
-	log.Println("Environment config:", c)
-
-	return nil
-}
-
 func NewConfiguration() *Configuration {
 	cfg := new(Configuration)
 
@@ -67,4 +45,26 @@ func NewConfiguration() *Configuration {
 	log.Println("Resulting config:", cfg)
 
 	return cfg
+}
+
+func (c *Configuration) fillFromFlags() {
+	flag.StringVar(&c.ServerAddress, "a", serverAddress, "string with server address")
+	flag.StringVar(&c.BaseURL, "b", baseURL, "string with base URL")
+	flag.StringVar(&c.FileStoragePath, "f", fileStoragePath, "string with file storage path")
+	flag.StringVar(&c.DatabaseDSN, "d", "", "string with database data source name")
+
+	flag.Parse()
+
+	log.Println("Console flags:", c)
+}
+
+func (c *Configuration) fillFromEnvironment() error {
+	err := env.Parse(c)
+	if err != nil {
+		return err
+	}
+
+	log.Println("Environment config:", c)
+
+	return nil
 }

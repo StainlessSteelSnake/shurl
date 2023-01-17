@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"github.com/StainlessSteelSnake/shurl/internal/auth"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -236,7 +237,7 @@ func Test_postLongURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := Handler{storage: &storage{tt.storage, tt.user}, user: &user{}}
+			h := Handler{storage: &storage{tt.storage, tt.user}, auth: auth.NewAuth()}
 
 			writer := httptest.NewRecorder()
 			requestBody := strings.NewReader(tt.longURL)
@@ -319,7 +320,7 @@ func Test_postLongURLinJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := Handler{storage: &storage{tt.storage, tt.user}, user: &user{}}
+			h := Handler{storage: &storage{tt.storage, tt.user}, auth: auth.NewAuth()}
 
 			writer := httptest.NewRecorder()
 			requestBody := strings.NewReader(tt.longURL)

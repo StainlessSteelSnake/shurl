@@ -1,15 +1,6 @@
 package handlers
 
-import (
-	"crypto/hmac"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
-	"errors"
-	"log"
-	"net/http"
-)
-
+/*
 type user struct {
 	id     string
 	sign   []byte
@@ -128,3 +119,4 @@ func (h *Handler) handleCookie(next http.HandlerFunc) http.HandlerFunc {
 		next(w, r)
 	}
 }
+*/

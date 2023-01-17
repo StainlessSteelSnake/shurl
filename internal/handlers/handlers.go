@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/StainlessSteelSnake/shurl/internal/auth"
+
 	"github.com/go-chi/chi/v5"
 )
 
@@ -22,7 +24,7 @@ type Storager interface {
 type Handler struct {
 	*chi.Mux
 	storage Storager
-	user    *user
+	auth    auth.Authenticator
 }
 
 type PostRequestBody struct {
@@ -108,16 +110,16 @@ func NewHandler(s Storager, bURL string) *Handler {
 	handler := &Handler{
 		chi.NewMux(),
 		s,
-		new(user),
+		auth.NewAuth(),
 	}
 
 	handler.Route("/", func(r chi.Router) {
-		r.Get("/{id}", handler.handleCookie(gzipHandler(handler.getLongURL)))
-		r.Get("/api/user/urls", handler.handleCookie(gzipHandler(handler.getLongURLsByUser)))
+		r.Get("/{id}", handler.auth.Authenticate(gzipHandler(handler.getLongURL)))
+		r.Get("/api/user/urls", handler.auth.Authenticate(gzipHandler(handler.getLongURLsByUser)))
 		r.Get("/ping", handler.ping)
-		r.Post("/", handler.handleCookie(gzipHandler(handler.postLongURL)))
-		r.Post("/api/shorten", handler.handleCookie(gzipHandler(handler.postLongURLinJSON)))
-		r.Post("/api/shorten/batch", handler.handleCookie(gzipHandler(handler.postLongURLinJSONbatch)))
+		r.Post("/", handler.auth.Authenticate(gzipHandler(handler.postLongURL)))
+		r.Post("/api/shorten", handler.auth.Authenticate(gzipHandler(handler.postLongURLinJSON)))
+		r.Post("/api/shorten/batch", handler.auth.Authenticate(gzipHandler(handler.postLongURLinJSONbatch)))
 		r.MethodNotAllowed(handler.badRequest)
 	})
 
@@ -149,13 +151,13 @@ func (h *Handler) getLongURL(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) getLongURLsByUser(w http.ResponseWriter, r *http.Request) {
 	log.Println("Полученный GET-запрос:", r.URL)
 
-	urls := h.storage.GetURLsByUser(h.user.id)
+	urls := h.storage.GetURLsByUser(h.auth.GetUserID())
 	if len(urls) == 0 {
-		log.Println("Для пользователя с идентификатором '" + h.user.id + "' не найдены сохранённые URL")
+		log.Println("Для пользователя с идентификатором '" + h.auth.GetUserID() + "' не найдены сохранённые URL")
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	log.Println("Для пользователя с идентификатором '"+h.user.id+"' найдено ", len(urls), "сохранённых URL:")
+	log.Println("Для пользователя с идентификатором '"+h.auth.GetUserID()+"' найдено ", len(urls), "сохранённых URL:")
 
 	response := make(shortAndLongURLs, 0)
 	for i, short := range urls {
@@ -171,8 +173,12 @@ func (h *Handler) getLongURLsByUser(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+
 	enc := json.NewEncoder(w)
-	enc.Encode(response)
+	err := enc.Encode(response)
+	if err != nil {
+		http.Error(w, "не удалось закодировать в JSON список URL", http.StatusInternalServerError)
+	}
 }
 
 func (h *Handler) postLongURL(w http.ResponseWriter, r *http.Request) {
@@ -193,7 +199,7 @@ func (h *Handler) postLongURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var duplicateFound bool
-	sh, e := h.storage.AddURL(l, h.user.id)
+	sh, e := h.storage.AddURL(l, h.auth.GetUserID())
 	if e != nil {
 		if !strings.Contains(e.Error(), l) {
 			log.Println("Ошибка '", e, "' при добавлении в БД URL:", l)
@@ -241,7 +247,7 @@ func (h *Handler) postLongURLinJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var duplicateFound bool
-	sh, e := h.storage.AddURL(requestBody.URL, h.user.id)
+	sh, e := h.storage.AddURL(requestBody.URL, h.auth.GetUserID())
 	if e != nil {
 
 		if !strings.Contains(e.Error(), requestBody.URL) {
@@ -311,7 +317,7 @@ func (h *Handler) postLongURLinJSONbatch(w http.ResponseWriter, r *http.Request)
 		longURLs = append(longURLs, [2]string{requestRecord.ID, requestRecord.URL})
 	}
 
-	shortURLs, e := h.storage.AddURLs(longURLs, h.user.id)
+	shortURLs, e := h.storage.AddURLs(longURLs, h.auth.GetUserID())
 	if e != nil {
 		log.Println("Ошибка '", e, "' при добавлении в БД URLs:", longURLs)
 		http.Error(w, "ошибка при добавлении в БД URLs: "+e.Error(), http.StatusInternalServerError)

@@ -13,8 +13,10 @@ import (
 
 const (
 	queryInsert = `
-	INSERT INTO public.short_urls(
-	short_url, long_url, user_id)
+	INSERT INTO public.short_urls
+	    (
+			short_url, long_url, user_id
+		)
 	VALUES ($1, $2, $3);`
 
 	queryCreateTable = `
@@ -28,13 +30,14 @@ const (
 	TABLESPACE pg_default;
 
 	CREATE UNIQUE INDEX IF NOT EXISTS unique_long_url
-    ON public.short_urls USING btree
-    (long_url COLLATE pg_catalog."default" ASC NULLS LAST)
+    	ON public.short_urls USING btree
+    	(long_url COLLATE pg_catalog."default" ASC NULLS LAST)
     TABLESPACE pg_default;
 `
 
 	querySelectAll = `
-	SELECT short_url, long_url, user_id FROM short_urls`
+	SELECT short_url, long_url, user_id 
+	FROM short_urls`
 
 	txPreparedName = "shurl-insert"
 )
@@ -47,6 +50,7 @@ type databaseStorage struct {
 
 func newDBStorage(m *memoryStorage, database string, ctx context.Context) *databaseStorage {
 	storage := &databaseStorage{m, nil, ctx}
+
 	var err error
 	storage.conn, err = pgx.Connect(ctx, database)
 	if err != nil {
