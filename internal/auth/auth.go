@@ -71,7 +71,7 @@ func (a *authentication) authNew() error {
 
 func (a *authentication) authExisting(cookie string) error {
 	if cookie == "" {
-		return errors.New("не переданы cookieFull для идентификации пользователя")
+		return errors.New("не переданы cookie для идентификации пользователя")
 	}
 	log.Println("Получены cookie '"+cookieAuthentication+"':", cookie)
 
@@ -118,6 +118,8 @@ func (a *authentication) Authenticate(next http.HandlerFunc) http.HandlerFunc {
 
 		cookie, err := r.Cookie(cookieAuthentication)
 		if err != nil {
+			a.cookieFull = ""
+			a.userID = ""
 			log.Println("Cookie '" + cookieAuthentication + "' не переданы")
 		}
 
