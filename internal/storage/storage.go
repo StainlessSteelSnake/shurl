@@ -13,11 +13,11 @@ import (
 type batchURLs = [][2]string
 
 type Storager interface {
-	CloseFunc() func()
 	AddURL(string, string) (string, error)
 	AddURLs(batchURLs, string) (batchURLs, error)
 	FindURL(string) (string, error)
 	GetURLsByUser(string) []string
+	CloseFunc() func()
 	Ping() error
 }
 
@@ -31,23 +31,15 @@ func NewStorage(filePath string, database string, ctx context.Context) Storager 
 		return newDBStorage(newMemoryStorage(), database, ctx)
 	}
 
-	if filePath == "" {
-		return newMemoryStorage()
+	if filePath != "" {
+		return newFileStorage(newMemoryStorage(), filePath)
 	}
 
-	return newFileStorage(newMemoryStorage(), filePath)
+	return newMemoryStorage()
 }
 
 func newMemoryStorage() *memoryStorage {
 	return &memoryStorage{map[string]string{}, map[string][]string{}}
-}
-
-func (s *memoryStorage) CloseFunc() func() {
-	return nil
-}
-
-func (s *memoryStorage) Ping() error {
-	return errors.New("БД не была подключена, используется хранилище в памяти")
 }
 
 func generateShortURL() (string, error) {
@@ -108,4 +100,12 @@ func (s *memoryStorage) FindURL(sh string) (string, error) {
 
 func (s *memoryStorage) GetURLsByUser(u string) []string {
 	return s.usersURLs[u]
+}
+
+func (s *memoryStorage) CloseFunc() func() {
+	return nil
+}
+
+func (s *memoryStorage) Ping() error {
+	return errors.New("БД не была подключена, используется хранилище в памяти")
 }

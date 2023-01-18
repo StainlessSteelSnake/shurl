@@ -92,22 +92,6 @@ func (s *fileStorage) saveToFile(r *Record) error {
 	return nil
 }
 
-func (s *fileStorage) CloseFunc() func() {
-	return func() {
-		if s.file == nil {
-			return
-		}
-
-		err := s.file.Close()
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		log.Println("файл", s.file.Name(), "был успешно закрыт")
-	}
-}
-
 func (s *fileStorage) AddURL(l, user string) (string, error) {
 	sh, err := s.memoryStorage.AddURL(l, user)
 	if err != nil {
@@ -142,4 +126,20 @@ func (s *fileStorage) AddURLs(longURLs batchURLs, user string) (batchURLs, error
 	}
 
 	return result, nil
+}
+
+func (s *fileStorage) CloseFunc() func() {
+	return func() {
+		if s.file == nil {
+			return
+		}
+
+		err := s.file.Close()
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		log.Println("файл", s.file.Name(), "был успешно закрыт")
+	}
 }

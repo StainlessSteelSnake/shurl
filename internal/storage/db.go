@@ -39,6 +39,8 @@ const (
 	SELECT short_url, long_url, user_id 
 	FROM short_urls`
 
+	querySelectByLongURL = `SELECT short_url FROM short_urls WHERE long_url = $1`
+
 	txPreparedName = "shurl-insert"
 )
 
@@ -46,6 +48,11 @@ type databaseStorage struct {
 	*memoryStorage
 	conn *pgx.Conn
 	ctx  context.Context
+}
+
+type DBError struct {
+	LongURL string
+	Err     error
 }
 
 func newDBStorage(m *memoryStorage, database string, ctx context.Context) *databaseStorage {
@@ -96,17 +103,12 @@ func (s *databaseStorage) init() error {
 	return nil
 }
 
-type StorageDBError struct {
-	LongURL string
-	Err     error
-}
-
-func (e *StorageDBError) Error() string {
+func (e *DBError) Error() string {
 	return fmt.Sprintf("Найден дубликат для полного URL: %v. Ошибка добавления в БД: %v", e.LongURL, e.Err)
 }
 
 func NewStorageDBError(longURL string, err error) error {
-	return &StorageDBError{
+	return &DBError{
 		LongURL: longURL,
 		Err:     err,
 	}
@@ -124,7 +126,7 @@ func (s *databaseStorage) AddURL(l, user string) (string, error) {
 		if !errors.As(err, &pgErr) {
 			return "", err
 		}
-		//pgErr, ok := err.(*pgconn.PgError)
+
 		log.Println("Ошибка операции с БД, код:", pgErr.Code, ", сообщение:", pgErr.Error())
 
 		if pgErr.Code != pgerrcode.UniqueViolation {
@@ -133,7 +135,7 @@ func (s *databaseStorage) AddURL(l, user string) (string, error) {
 
 		duplicateErr := NewStorageDBError(l, err)
 
-		r := s.conn.QueryRow(s.ctx, "SELECT short_url FROM short_urls WHERE long_url = $1", l)
+		r := s.conn.QueryRow(s.ctx, querySelectByLongURL, l)
 		err = r.Scan(&sh)
 		if err != nil {
 			return "", NewStorageDBError(l, err)
@@ -145,27 +147,6 @@ func (s *databaseStorage) AddURL(l, user string) (string, error) {
 
 	log.Println("Добавлено строк:", ct.RowsAffected())
 	return sh, nil
-}
-
-func (s *databaseStorage) CloseFunc() func() {
-	return func() {
-		if s.conn == nil {
-			return
-		}
-
-		err := s.conn.Close(s.ctx)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-	}
-}
-
-func (s *databaseStorage) Ping() error {
-	if s.conn == nil {
-		return s.memoryStorage.Ping()
-	}
-	return s.conn.Ping(s.ctx)
 }
 
 func (s *databaseStorage) AddURLs(longURLs batchURLs, user string) (batchURLs, error) {
@@ -206,4 +187,25 @@ func (s *databaseStorage) AddURLs(longURLs batchURLs, user string) (batchURLs, e
 	}
 
 	return result, nil
+}
+
+func (s *databaseStorage) CloseFunc() func() {
+	return func() {
+		if s.conn == nil {
+			return
+		}
+
+		err := s.conn.Close(s.ctx)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+	}
+}
+
+func (s *databaseStorage) Ping() error {
+	if s.conn == nil {
+		return s.memoryStorage.Ping()
+	}
+	return s.conn.Ping(s.ctx)
 }
