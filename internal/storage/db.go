@@ -11,38 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-const (
-	queryInsert = `
-	INSERT INTO public.short_urls
-	    (
-			short_url, long_url, user_id
-		)
-	VALUES ($1, $2, $3);`
-
-	queryCreateTable = `
-	CREATE TABLE IF NOT EXISTS public.short_urls
-		(
-			short_url character varying(14) COLLATE pg_catalog."default" NOT NULL,
-			long_url character varying COLLATE pg_catalog."default" NOT NULL,
-			user_id character varying COLLATE pg_catalog."default",
-			CONSTRAINT short_urls_pkey PRIMARY KEY (short_url)
-		)	
-	TABLESPACE pg_default;
-
-	CREATE UNIQUE INDEX IF NOT EXISTS unique_long_url
-    	ON public.short_urls USING btree
-    	(long_url COLLATE pg_catalog."default" ASC NULLS LAST)
-    TABLESPACE pg_default;
-`
-
-	querySelectAll = `
-	SELECT short_url, long_url, user_id 
-	FROM short_urls`
-
-	querySelectByLongURL = `SELECT short_url FROM short_urls WHERE long_url = $1`
-
-	txPreparedName = "shurl-insert"
-)
+const txPreparedName = "shurl-insert"
 
 type databaseStorage struct {
 	*memoryStorage
@@ -89,7 +58,11 @@ func (s *databaseStorage) init() error {
 
 	for rows.Next() {
 		var sh, l, u string
-		rows.Scan(&sh, &l, &u)
+		err = rows.Scan(&sh, &l, &u)
+		if err != nil {
+			log.Println("Ошибка чтения из БД:", err)
+		}
+
 		s.memoryStorage.container[sh] = l
 		s.memoryStorage.usersURLs[u] = append(s.memoryStorage.usersURLs[u], sh)
 	}
