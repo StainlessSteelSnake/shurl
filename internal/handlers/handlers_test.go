@@ -2,20 +2,24 @@ package handlers
 
 import (
 	"errors"
-	"github.com/stretchr/testify/assert"
+	"github.com/StainlessSteelSnake/shurl/internal/auth"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type storage struct {
 	container map[string]string
+	usersURLs map[string][]string
 }
 
-func (s *storage) AddURL(l string) (string, error) {
+func (s *storage) AddURL(l, user string) (string, error) {
 	s.container[l] = l
+	s.usersURLs[user] = append(s.usersURLs[user], l)
 	return l, nil
 }
 
@@ -24,6 +28,35 @@ func (s *storage) FindURL(sh string) (string, error) {
 		return l, nil
 	}
 	return "", errors.New("короткий URL с ID \" + string(sh) + \" не существует")
+}
+
+func (s *storage) GetURLsByUser(u string) []string {
+	return s.usersURLs[u]
+}
+
+func (s *storage) Ping() error {
+	return nil
+}
+
+func (s *storage) AddURLs(b [][2]string, user string) ([][2]string, error) {
+	for _, record := range b {
+		s.container[record[1]] = record[1]
+		s.usersURLs[user] = append(s.usersURLs[user], record[1])
+
+	}
+	return b, nil
+}
+
+func TestGzipWriter_Write(t *testing.T) {
+	t.Skip()
+}
+
+func Test_handler_gzipHandler(t *testing.T) {
+	t.Skip()
+}
+
+func Test_decodeRequest(t *testing.T) {
+	t.Skip()
 }
 
 func Test_handler_badRequest(t *testing.T) {
@@ -62,7 +95,9 @@ func TestNewHandler(t *testing.T) {
 	tests := []struct {
 		name    string
 		storage map[string]string
+		user    map[string][]string
 		host    string
+		baseURL string
 		request string
 		method  string
 		want    int
@@ -70,7 +105,9 @@ func TestNewHandler(t *testing.T) {
 		{
 			name:    "Неуспешный PUT-запрос",
 			storage: map[string]string{"dummy": "https://ya.ru"},
+			user:    map[string][]string{"user1": {"https://ya.ru"}},
 			host:    "localhost:8080",
+			baseURL: "http://localhost:8080/",
 			request: "localhost:8080/dummy",
 			method:  http.MethodPut,
 			want:    http.StatusBadRequest,
@@ -78,7 +115,9 @@ func TestNewHandler(t *testing.T) {
 		{
 			name:    "Неуспешный GET-запрос",
 			storage: map[string]string{"dummy": "https://ya.ru"},
+			user:    map[string][]string{"user2": {"https://ya.ru"}},
 			host:    "localhost:8080",
+			baseURL: "http://localhost:8080/",
 			request: "localhost:8080/dummy",
 			method:  http.MethodGet,
 			want:    http.StatusBadRequest,
@@ -86,7 +125,9 @@ func TestNewHandler(t *testing.T) {
 		{
 			name:    "Неуспешный POST-запрос",
 			storage: map[string]string{"dummy": "https://ya.ru"},
+			user:    map[string][]string{"user3": {"https://ya.ru"}},
 			host:    "localhost:8080",
+			baseURL: "http://localhost:8080/",
 			request: "localhost:8080/dummy",
 			method:  http.MethodPost,
 			want:    http.StatusBadRequest,
@@ -95,8 +136,8 @@ func TestNewHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &storage{tt.storage}
-			h := NewHandler(s)
+			s := &storage{tt.storage, tt.user}
+			h := NewHandler(s, tt.baseURL)
 
 			request := httptest.NewRequest(tt.method, tt.request, nil)
 			writer := httptest.NewRecorder()
@@ -116,6 +157,7 @@ func Test_getLongURL(t *testing.T) {
 	tests := []struct {
 		name     string
 		storage  map[string]string
+		user     map[string][]string
 		request  string
 		wantCode int
 		wantURL  string
@@ -123,6 +165,7 @@ func Test_getLongURL(t *testing.T) {
 		{
 			name:     "Неуспешный запрос, ошибка в идентификаторе",
 			storage:  map[string]string{"dummy": "https://ya.ru"},
+			user:     map[string][]string{"user1": {"https://ya.ru"}},
 			request:  "/dummy1",
 			wantCode: http.StatusBadRequest,
 			wantURL:  "",
@@ -130,6 +173,7 @@ func Test_getLongURL(t *testing.T) {
 		{
 			name:     "Неуспешный запрос, не передан идентификатор",
 			storage:  map[string]string{"dummy": "https://ya.ru"},
+			user:     map[string][]string{"user2": {"https://ya.ru"}},
 			request:  "/",
 			wantCode: http.StatusBadRequest,
 			wantURL:  "",
@@ -137,6 +181,7 @@ func Test_getLongURL(t *testing.T) {
 		{
 			name:     "Успешный GET-запрос",
 			storage:  map[string]string{"dummy": "https://ya.ru"},
+			user:     map[string][]string{"user3": {"https://ya.ru"}},
 			request:  "/dummy",
 			wantCode: http.StatusTemporaryRedirect,
 			wantURL:  "https://ya.ru",
@@ -145,7 +190,7 @@ func Test_getLongURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := Handler{storage: &storage{tt.storage}}
+			h := Handler{storage: &storage{tt.storage, tt.user}}
 
 			writer := httptest.NewRecorder()
 			request := httptest.NewRequest(http.MethodGet, tt.request, nil)
@@ -166,6 +211,63 @@ func Test_postLongURL(t *testing.T) {
 		name     string
 		host     string
 		storage  map[string]string
+		user     map[string][]string
+		longURL  string
+		wantCode int
+		wantURL  string
+	}{
+		{
+			name:     "Успешный запрос",
+			host:     "localhost:8080",
+			storage:  map[string]string{"dummy1": "https://ya.ru"},
+			user:     map[string][]string{"user1": {"dummy1"}},
+			longURL:  "https://ya.ru",
+			wantCode: http.StatusCreated,
+			wantURL:  "http://localhost:8080/",
+		},
+		{
+			name:     "Неуспешный запрос, в теле не передан URL",
+			host:     "localhost:8080",
+			storage:  map[string]string{"dummy2": "https://ya.ru"},
+			user:     map[string][]string{"user2": {"dummy2"}},
+			longURL:  "",
+			wantCode: http.StatusBadRequest,
+			wantURL:  "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := Handler{storage: &storage{tt.storage, tt.user}, auth: auth.NewAuth()}
+
+			writer := httptest.NewRecorder()
+			requestBody := strings.NewReader(tt.longURL)
+
+			request := httptest.NewRequest(http.MethodPost, "/", requestBody)
+			request.Host = tt.host
+			h.postLongURL(writer, request)
+
+			result := writer.Result()
+			assert.Equal(t, tt.wantCode, result.StatusCode)
+
+			resultBody, err := io.ReadAll(result.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assert.Contains(t, string(resultBody), tt.wantURL)
+
+			if err = result.Body.Close(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func Test_postLongURLinJSON(t *testing.T) {
+	tests := []struct {
+		name     string
+		host     string
+		storage  map[string]string
+		user     map[string][]string
 		longURL  string
 		wantCode int
 		wantURL  string
@@ -174,7 +276,8 @@ func Test_postLongURL(t *testing.T) {
 			name:     "Успешный запрос",
 			host:     "localhost:8080",
 			storage:  map[string]string{"dummy": "https://ya.ru"},
-			longURL:  "https://ya.ru",
+			user:     map[string][]string{"user1": {"https://ya.ru"}},
+			longURL:  `{"url":"https://ya.ru"}`,
 			wantCode: http.StatusCreated,
 			wantURL:  "http://localhost:8080/",
 		},
@@ -182,21 +285,49 @@ func Test_postLongURL(t *testing.T) {
 			name:     "Неуспешный запрос, в теле не передан URL",
 			host:     "localhost:8080",
 			storage:  map[string]string{"dummy": "https://ya.ru"},
-			longURL:  "",
+			user:     map[string][]string{"user2": {"https://ya.ru"}},
+			longURL:  ``,
+			wantCode: http.StatusBadRequest,
+			wantURL:  "",
+		},
+		{
+			name:     "Неуспешный запрос, неправильное название поля в JSON",
+			host:     "localhost:8080",
+			storage:  map[string]string{"dummy": "https://ya.ru"},
+			user:     map[string][]string{"user3": {"https://ya.ru"}},
+			longURL:  `{"URL1":"https://ya.ru"}`,
+			wantCode: http.StatusBadRequest,
+			wantURL:  "",
+		},
+		{
+			name:     "Неуспешный запрос, неправильный формат поля в JSON",
+			host:     "localhost:8080",
+			storage:  map[string]string{"dummy": "https://ya.ru"},
+			user:     map[string][]string{"user4": {"https://ya.ru"}},
+			longURL:  `{url:"https://ya.ru"}`,
+			wantCode: http.StatusBadRequest,
+			wantURL:  "",
+		},
+		{
+			name:     "Неуспешный запрос, некорректная структура JSON",
+			host:     "localhost:8080",
+			storage:  map[string]string{"dummy": "https://ya.ru"},
+			user:     map[string][]string{"user5": {"https://ya.ru"}},
+			longURL:  `{"url":"https://ya.ru`,
 			wantCode: http.StatusBadRequest,
 			wantURL:  "",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := Handler{storage: &storage{tt.storage}}
+			h := Handler{storage: &storage{tt.storage, tt.user}, auth: auth.NewAuth()}
 
 			writer := httptest.NewRecorder()
 			requestBody := strings.NewReader(tt.longURL)
 
-			request := httptest.NewRequest(http.MethodPost, "/", requestBody)
+			request := httptest.NewRequest(http.MethodPost, "/api/shorten", requestBody)
 			request.Host = tt.host
-			h.postLongURL(writer, request)
+			h.postLongURLinJSON(writer, request)
 
 			result := writer.Result()
 			assert.Equal(t, tt.wantCode, result.StatusCode)
