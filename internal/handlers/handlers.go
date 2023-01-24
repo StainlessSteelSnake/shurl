@@ -99,7 +99,7 @@ func (h *Handler) getLongURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if d == true {
+	if d {
 		log.Println("URL", l, "для короткого идентификатора", sh, "был удалён")
 		w.WriteHeader(http.StatusGone)
 		return

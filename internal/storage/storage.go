@@ -24,7 +24,7 @@ type Storager interface {
 }
 
 type memoryRecord struct {
-	longURl string
+	longURL string
 	user    string
 	deleted bool
 }
@@ -80,7 +80,7 @@ func (s *memoryStorage) AddURL(l, user string) (string, error) {
 		return "", errors.New("короткий URL с ID " + string(sh) + " уже существует")
 	}
 
-	s.container[sh] = memoryRecord{longURl: l, deleted: false, user: user}
+	s.container[sh] = memoryRecord{longURL: l, deleted: false, user: user}
 	s.usersURLs[user] = append(s.usersURLs[user], sh)
 	return sh, nil
 }
@@ -114,11 +114,11 @@ func (s *memoryStorage) FindURL(sh string) (string, bool, error) {
 		return "", false, errors.New("короткий URL с ID \" + string(sh) + \" не существует")
 	}
 
-	if r.deleted == true {
+	if r.deleted {
 		return "", r.deleted, errors.New("короткий URL с ID \" + string(sh) + \" удалён")
 	}
 
-	return r.longURl, r.deleted, nil
+	return r.longURL, r.deleted, nil
 }
 
 func (s *memoryStorage) GetURLsByUser(u string) []string {
@@ -141,7 +141,7 @@ func (s *memoryStorage) DeleteURLs(shortURLs []string, user string) (deleted []s
 			continue
 		}
 
-		s.container[sh] = memoryRecord{longURl: mr.longURl, user: mr.user, deleted: true}
+		s.container[sh] = memoryRecord{longURL: mr.longURL, user: mr.user, deleted: true}
 		deleted = append(deleted, sh)
 	}
 

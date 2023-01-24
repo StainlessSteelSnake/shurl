@@ -69,7 +69,7 @@ func (s *fileStorage) loadFromFile() error {
 		if r.ShortURL == "" || r.LongURL == "" {
 			continue
 		}
-		s.container[r.ShortURL] = memoryRecord{longURl: r.LongURL, deleted: r.Deleted, user: r.UserID}
+		s.container[r.ShortURL] = memoryRecord{longURL: r.LongURL, deleted: r.Deleted, user: r.UserID}
 
 		if r.UserID == "" {
 			continue
@@ -133,7 +133,7 @@ func (s *fileStorage) DeleteURLs(shortURLs []string, user string) (deleted []str
 	deleted = s.memoryStorage.DeleteURLs(shortURLs, user)
 
 	for _, sh := range deleted {
-		err := s.saveToFile(&Record{ShortURL: sh, LongURL: s.container[sh].longURl, Deleted: true, UserID: user})
+		err := s.saveToFile(&Record{ShortURL: sh, LongURL: s.container[sh].longURL, Deleted: true, UserID: user})
 		if err != nil {
 			log.Println("Ошибка при записи удалённой ссылки с id", sh, "в файл")
 		}

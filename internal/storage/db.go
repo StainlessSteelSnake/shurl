@@ -61,12 +61,19 @@ func (s *databaseStorage) deletionQueueProcess(ctx context.Context) chan error {
 				deletionBatch = append(deletionBatch, sh)
 
 				if len(deletionBatch) >= DeletionBatchSize {
+					s.delete(deletionBatch)
 					deletionBatch = deletionBatch[:0]
 				}
 
 			case <-ctx.Done():
 				return
 			default:
+				if len(deletionBatch) == 0 {
+					continue
+				}
+
+				s.delete(deletionBatch)
+				deletionBatch = deletionBatch[:0]
 			}
 		}
 	}(s, ctx)
@@ -171,7 +178,7 @@ func (s *databaseStorage) init() error {
 			log.Println("Ошибка чтения из БД:", err)
 		}
 
-		s.memoryStorage.container[sh] = memoryRecord{longURl: l, deleted: d, user: u}
+		s.memoryStorage.container[sh] = memoryRecord{longURL: l, deleted: d, user: u}
 		s.memoryStorage.usersURLs[u] = append(s.memoryStorage.usersURLs[u], sh)
 	}
 
