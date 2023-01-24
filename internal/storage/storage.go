@@ -115,7 +115,7 @@ func (s *memoryStorage) FindURL(sh string) (string, bool, error) {
 	}
 
 	if r.deleted {
-		return "", r.deleted, errors.New("короткий URL с ID \" + string(sh) + \" удалён")
+		return "", r.deleted, nil
 	}
 
 	return r.longURL, r.deleted, nil
