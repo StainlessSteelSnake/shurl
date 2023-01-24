@@ -208,6 +208,9 @@ func (s *databaseStorage) AddURL(l, user string) (string, error) {
 		return "", err
 	}
 
+	s.locker.Lock()
+	defer s.locker.Unlock()
+
 	ct, err := s.conn.Exec(s.ctx, queryInsert, sh, l, user)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -268,6 +271,9 @@ func (s *databaseStorage) AddURLs(longURLs batchURLs, user string) (batchURLs, e
 
 		result = append(result, [2]string{id, sh})
 	}
+
+	s.locker.Lock()
+	defer s.locker.Unlock()
 
 	err = tx.Commit(s.ctx)
 	if err != nil {

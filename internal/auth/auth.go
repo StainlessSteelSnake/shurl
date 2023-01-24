@@ -81,7 +81,7 @@ func (a *authentication) authExisting(cookie string) error {
 	}
 	log.Println("Cookie расшифрованы в следующие байты:", data)
 
-	if userIDLength*2 < len(cookie) {
+	if len(cookie) < userIDLength*2 {
 		return errors.New("неправильная длина cookie")
 	}
 	id := cookie[:userIDLength*2]

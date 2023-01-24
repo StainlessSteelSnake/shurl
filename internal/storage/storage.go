@@ -122,6 +122,9 @@ func (s *memoryStorage) FindURL(sh string) (string, bool, error) {
 }
 
 func (s *memoryStorage) GetURLsByUser(u string) []string {
+	s.locker.RLock()
+	defer s.locker.RUnlock()
+
 	return s.usersURLs[u]
 }
 
