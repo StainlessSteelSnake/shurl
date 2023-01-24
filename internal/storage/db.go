@@ -4,19 +4,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/jackc/pgx/v5/pgconn"
-	"log"
-
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"log"
+	"sync"
 )
 
-const txPreparedName = "shurl-insert"
+const txPreparedInsert = "shurl-insert"
+const txPreparedDelete = "shurl-delete"
 
 type databaseStorage struct {
 	*memoryStorage
-	conn *pgx.Conn
-	ctx  context.Context
+	conn           *pgx.Conn
+	ctx            context.Context
+	deletionQueue  chan string
+	deletionCancel context.CancelFunc
+	errors         chan error
+	locker         sync.Mutex
 }
 
 type DBError struct {
@@ -24,8 +29,103 @@ type DBError struct {
 	Err     error
 }
 
+const DeletionBatchSize = 20
+const DeletionQueueSize = DeletionBatchSize * 2
+
+func (s *databaseStorage) DeleteURLs(shortURLs []string, user string) (deleted []string) {
+	deleted = make([]string, 0)
+
+	go func() {
+		deleted = s.memoryStorage.DeleteURLs(shortURLs, user)
+
+		for _, sh := range deleted {
+			s.deletionQueue <- sh
+		}
+	}()
+
+	return deleted
+}
+
+func (s *databaseStorage) deletionQueueProcess(ctx context.Context) chan error {
+	err := make(chan error)
+
+	go func(s *databaseStorage, ctx context.Context) {
+		deletionBatch := make([]string, DeletionBatchSize)
+		for {
+			select {
+			case sh, ok := <-s.deletionQueue:
+				if !ok {
+					return
+				}
+
+				deletionBatch = append(deletionBatch, sh)
+
+				if len(deletionBatch) >= DeletionBatchSize {
+					deletionBatch = deletionBatch[:0]
+				}
+
+			case <-ctx.Done():
+				return
+			default:
+			}
+		}
+	}(s, ctx)
+
+	return err
+}
+
+func (s *databaseStorage) errorProcess() {
+	go func() {
+		for {
+			select {
+			case err, ok := <-s.errors:
+				if !ok {
+					return
+				}
+
+				log.Println(err)
+			case <-s.ctx.Done():
+				return
+			}
+		}
+	}()
+}
+
+func (s *databaseStorage) delete(deletionBatch []string) {
+	s.locker.Lock()
+	defer s.locker.Unlock()
+
+	tx, err := s.conn.Begin(s.ctx)
+	if err != nil {
+		s.errors <- err
+		return
+	}
+
+	defer tx.Rollback(s.ctx)
+
+	_, err = tx.Prepare(s.ctx, txPreparedDelete, queryDelete)
+	if err != nil {
+		s.errors <- err
+		return
+	}
+
+	for _, sh := range deletionBatch {
+		_, err = tx.Exec(s.ctx, txPreparedDelete, sh)
+		if err != nil {
+			s.errors <- err
+			return
+		}
+	}
+
+	err = tx.Commit(s.ctx)
+	if err != nil {
+		s.errors <- err
+		return
+	}
+}
+
 func newDBStorage(m *memoryStorage, database string, ctx context.Context) *databaseStorage {
-	storage := &databaseStorage{m, nil, ctx}
+	storage := &databaseStorage{memoryStorage: m, conn: nil, ctx: ctx, deletionQueue: nil}
 
 	var err error
 	storage.conn, err = pgx.Connect(ctx, database)
@@ -38,6 +138,13 @@ func newDBStorage(m *memoryStorage, database string, ctx context.Context) *datab
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	storage.deletionQueue = make(chan string, DeletionQueueSize)
+
+	var deletionCtx context.Context
+	deletionCtx, storage.deletionCancel = context.WithCancel(ctx)
+
+	storage.errors = storage.deletionQueueProcess(deletionCtx)
 
 	return storage
 }
@@ -58,12 +165,13 @@ func (s *databaseStorage) init() error {
 
 	for rows.Next() {
 		var sh, l, u string
-		err = rows.Scan(&sh, &l, &u)
+		var d bool
+		err = rows.Scan(&sh, &l, &u, &d)
 		if err != nil {
 			log.Println("Ошибка чтения из БД:", err)
 		}
 
-		s.memoryStorage.container[sh] = l
+		s.memoryStorage.container[sh] = memoryRecord{longURl: l, deleted: d, user: u}
 		s.memoryStorage.usersURLs[u] = append(s.memoryStorage.usersURLs[u], sh)
 	}
 
@@ -132,7 +240,7 @@ func (s *databaseStorage) AddURLs(longURLs batchURLs, user string) (batchURLs, e
 
 	defer tx.Rollback(s.ctx)
 
-	_, err = tx.Prepare(s.ctx, txPreparedName, queryInsert)
+	_, err = tx.Prepare(s.ctx, txPreparedInsert, queryInsert)
 	if err != nil {
 		return result[:0], err
 	}
@@ -146,7 +254,7 @@ func (s *databaseStorage) AddURLs(longURLs batchURLs, user string) (batchURLs, e
 			return result[:0], err
 		}
 
-		_, err = tx.Exec(s.ctx, txPreparedName, sh, l, user)
+		_, err = tx.Exec(s.ctx, txPreparedInsert, sh, l, user)
 		if err != nil {
 			return result[:0], err
 		}
@@ -164,6 +272,10 @@ func (s *databaseStorage) AddURLs(longURLs batchURLs, user string) (batchURLs, e
 
 func (s *databaseStorage) CloseFunc() func() {
 	return func() {
+		s.deletionCancel()
+		close(s.deletionQueue)
+		close(s.errors)
+
 		if s.conn == nil {
 			return
 		}

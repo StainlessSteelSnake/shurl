@@ -23,11 +23,11 @@ func (s *storage) AddURL(l, user string) (string, error) {
 	return l, nil
 }
 
-func (s *storage) FindURL(sh string) (string, error) {
+func (s *storage) FindURL(sh string) (string, bool, error) {
 	if l, ok := s.container[sh]; ok {
-		return l, nil
+		return l, false, nil
 	}
-	return "", errors.New("короткий URL с ID \" + string(sh) + \" не существует")
+	return "", false, errors.New("короткий URL с ID \" + string(sh) + \" не существует")
 }
 
 func (s *storage) GetURLsByUser(u string) []string {
@@ -45,6 +45,10 @@ func (s *storage) AddURLs(b [][2]string, user string) ([][2]string, error) {
 
 	}
 	return b, nil
+}
+
+func (s *storage) DeleteURLs(urls []string, user string) []string {
+	return urls
 }
 
 func TestGzipWriter_Write(t *testing.T) {

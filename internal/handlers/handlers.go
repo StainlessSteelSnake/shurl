@@ -14,8 +14,9 @@ import (
 type Storager interface {
 	AddURL(l, user string) (string, error)
 	AddURLs([][2]string, string) ([][2]string, error)
-	FindURL(sh string) (string, error)
+	FindURL(sh string) (string, bool, error)
 	GetURLsByUser(string) []string
+	DeleteURLs([]string, string) []string
 	Ping() error
 }
 
@@ -42,6 +43,8 @@ type PostResponseRecord struct {
 	ID       string `json:"correlation_id"`
 	ShortURL string `json:"short_url"`
 }
+
+type DeleteRequestBody []string
 
 type PostRequestBatch []PostRequestRecord
 
@@ -72,6 +75,7 @@ func NewHandler(s Storager, bURL string) *Handler {
 		r.Post("/", handler.auth.Authenticate(gzipHandler(handler.postLongURL)))
 		r.Post("/api/shorten", handler.auth.Authenticate(gzipHandler(handler.postLongURLinJSON)))
 		r.Post("/api/shorten/batch", handler.auth.Authenticate(gzipHandler(handler.postLongURLinJSONbatch)))
+		r.Delete("/api/user/urls", handler.auth.Authenticate(gzipHandler(handler.deleteURLs)))
 		r.MethodNotAllowed(handler.badRequest)
 	})
 
@@ -88,14 +92,20 @@ func (h *Handler) getLongURL(w http.ResponseWriter, r *http.Request) {
 	sh := strings.Trim(r.URL.Path, "/")
 	log.Println("Идентификатор короткого URL, полученный из GET-запроса:", sh)
 
-	l, e := h.storage.FindURL(sh)
+	l, d, e := h.storage.FindURL(sh)
 	if e != nil {
 		log.Println("Ошибка '", e, "'. Не найден URL с указанным коротким идентификатором:", sh)
 		http.Error(w, "URL с указанным коротким идентификатором не найден", http.StatusBadRequest)
 		return
 	}
-	log.Println("Найден URL", l, "для короткого идентификатора", sh)
 
+	if d == true {
+		log.Println("URL", l, "для короткого идентификатора", sh, "был удалён")
+		w.WriteHeader(http.StatusGone)
+		return
+	}
+
+	log.Println("Найден URL", l, "для короткого идентификатора", sh)
 	w.Header().Set("Location", l)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
@@ -113,7 +123,7 @@ func (h *Handler) getLongURLsByUser(w http.ResponseWriter, r *http.Request) {
 
 	response := make(shortAndLongURLs, 0)
 	for i, short := range urls {
-		long, err := h.storage.FindURL(short)
+		long, _, err := h.storage.FindURL(short)
 		if err != nil {
 			continue
 		}
@@ -295,4 +305,31 @@ func (h *Handler) postLongURLinJSONbatch(w http.ResponseWriter, r *http.Request)
 	if e != nil {
 		log.Println("Ошибка при записи ответа в тело запроса:", e)
 	}
+}
+
+func (h *Handler) deleteURLs(w http.ResponseWriter, r *http.Request) {
+	b, e := decodeRequest(r)
+	if e != nil {
+		log.Println("Неверный формат данных в запросе:", e)
+		http.Error(w, "неверный формат данных в запросе: "+e.Error(), http.StatusBadRequest)
+		return
+	}
+
+	requestBody := DeleteRequestBody{}
+	e = json.Unmarshal(b, &requestBody)
+	if e != nil {
+		log.Println("Неверный формат данных в запросе:", e)
+		http.Error(w, "неверный формат данных в запросе: "+e.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if len(requestBody) == 0 {
+		log.Println("Пустой список идентификаторов URL")
+		http.Error(w, "пустой список идентификаторов URL", http.StatusBadRequest)
+		return
+	}
+
+	_ = h.storage.DeleteURLs(requestBody, h.auth.GetUserID())
+
+	w.WriteHeader(http.StatusAccepted)
 }

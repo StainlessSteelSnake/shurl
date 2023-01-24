@@ -16,6 +16,7 @@ type fileStorage struct {
 type Record struct {
 	ShortURL string `json:"short_url"`
 	LongURL  string `json:"long_url"`
+	Deleted  bool   `json:"deleted,omitempty"`
 	UserID   string `json:"user_id"`
 }
 
@@ -68,7 +69,7 @@ func (s *fileStorage) loadFromFile() error {
 		if r.ShortURL == "" || r.LongURL == "" {
 			continue
 		}
-		s.container[r.ShortURL] = r.LongURL
+		s.container[r.ShortURL] = memoryRecord{longURl: r.LongURL, deleted: r.Deleted, user: r.UserID}
 
 		if r.UserID == "" {
 			continue
@@ -98,7 +99,7 @@ func (s *fileStorage) AddURL(l, user string) (string, error) {
 		return "", err
 	}
 
-	err = s.saveToFile(&Record{sh, l, user})
+	err = s.saveToFile(&Record{ShortURL: sh, LongURL: l, Deleted: false, UserID: user})
 	if err != nil {
 		return sh, err
 	}
@@ -117,7 +118,7 @@ func (s *fileStorage) AddURLs(longURLs batchURLs, user string) (batchURLs, error
 			return result[:0], err
 		}
 
-		err = s.saveToFile(&Record{sh, l, user})
+		err = s.saveToFile(&Record{ShortURL: sh, LongURL: l, Deleted: false, UserID: user})
 		if err != nil {
 			return result[:0], err
 		}
@@ -126,6 +127,19 @@ func (s *fileStorage) AddURLs(longURLs batchURLs, user string) (batchURLs, error
 	}
 
 	return result, nil
+}
+
+func (s *fileStorage) DeleteURLs(shortURLs []string, user string) (deleted []string) {
+	deleted = s.memoryStorage.DeleteURLs(shortURLs, user)
+
+	for _, sh := range deleted {
+		err := s.saveToFile(&Record{ShortURL: sh, LongURL: s.container[sh].longURl, Deleted: true, UserID: user})
+		if err != nil {
+			log.Println("Ошибка при записи удалённой ссылки с id", sh, "в файл")
+		}
+	}
+
+	return deleted
 }
 
 func (s *fileStorage) CloseFunc() func() {

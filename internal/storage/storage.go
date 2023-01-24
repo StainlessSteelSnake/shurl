@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -15,15 +16,23 @@ type batchURLs = [][2]string
 type Storager interface {
 	AddURL(string, string) (string, error)
 	AddURLs(batchURLs, string) (batchURLs, error)
-	FindURL(string) (string, error)
+	FindURL(string) (string, bool, error)
 	GetURLsByUser(string) []string
+	DeleteURLs([]string, string) []string
 	CloseFunc() func()
 	Ping() error
 }
 
+type memoryRecord struct {
+	longURl string
+	user    string
+	deleted bool
+}
+
 type memoryStorage struct {
-	container map[string]string
+	container map[string]memoryRecord
 	usersURLs map[string][]string
+	locker    sync.RWMutex
 }
 
 func NewStorage(filePath string, database string, ctx context.Context) Storager {
@@ -39,7 +48,7 @@ func NewStorage(filePath string, database string, ctx context.Context) Storager 
 }
 
 func newMemoryStorage() *memoryStorage {
-	return &memoryStorage{map[string]string{}, map[string][]string{}}
+	return &memoryStorage{map[string]memoryRecord{}, map[string][]string{}, sync.RWMutex{}}
 }
 
 func generateShortURL() (string, error) {
@@ -59,6 +68,9 @@ func generateShortURL() (string, error) {
 }
 
 func (s *memoryStorage) AddURL(l, user string) (string, error) {
+	s.locker.Lock()
+	defer s.locker.Unlock()
+
 	sh, err := generateShortURL()
 	if err != nil {
 		return "", err
@@ -68,12 +80,15 @@ func (s *memoryStorage) AddURL(l, user string) (string, error) {
 		return "", errors.New("короткий URL с ID " + string(sh) + " уже существует")
 	}
 
-	s.container[sh] = l
+	s.container[sh] = memoryRecord{longURl: l, deleted: false, user: user}
 	s.usersURLs[user] = append(s.usersURLs[user], sh)
 	return sh, nil
 }
 
 func (s *memoryStorage) AddURLs(longURLs batchURLs, user string) (batchURLs, error) {
+	s.locker.Lock()
+	defer s.locker.Unlock()
+
 	result := make(batchURLs, 0, len(longURLs))
 	for _, longURL := range longURLs {
 		id := longURL[0]
@@ -90,16 +105,47 @@ func (s *memoryStorage) AddURLs(longURLs batchURLs, user string) (batchURLs, err
 	return result, nil
 }
 
-func (s *memoryStorage) FindURL(sh string) (string, error) {
-	if l, ok := s.container[sh]; ok {
-		return l, nil
+func (s *memoryStorage) FindURL(sh string) (string, bool, error) {
+	s.locker.RLock()
+	defer s.locker.RUnlock()
+
+	r, ok := s.container[sh]
+	if !ok {
+		return "", false, errors.New("короткий URL с ID \" + string(sh) + \" не существует")
 	}
 
-	return "", errors.New("короткий URL с ID \" + string(sh) + \" не существует")
+	if r.deleted == true {
+		return "", r.deleted, errors.New("короткий URL с ID \" + string(sh) + \" удалён")
+	}
+
+	return r.longURl, r.deleted, nil
 }
 
 func (s *memoryStorage) GetURLsByUser(u string) []string {
 	return s.usersURLs[u]
+}
+
+func (s *memoryStorage) DeleteURLs(shortURLs []string, user string) (deleted []string) {
+	deleted = make([]string, 0)
+
+	s.locker.Lock()
+	defer s.locker.Unlock()
+
+	for _, sh := range shortURLs {
+		mr, ok := s.container[sh]
+		if !ok {
+			continue
+		}
+
+		if mr.user != user {
+			continue
+		}
+
+		s.container[sh] = memoryRecord{longURl: mr.longURl, user: mr.user, deleted: true}
+		deleted = append(deleted, sh)
+	}
+
+	return deleted
 }
 
 func (s *memoryStorage) CloseFunc() func() {
