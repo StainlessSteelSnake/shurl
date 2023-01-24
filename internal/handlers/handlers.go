@@ -61,6 +61,7 @@ type shortAndLongURLs []shortAndLongURL
 
 func NewHandler(s Storager, bURL string) *Handler {
 	baseURL = bURL
+	log.Println("Base URL:", baseURL)
 
 	handler := &Handler{
 		chi.NewMux(),
@@ -331,6 +332,10 @@ func (h *Handler) deleteURLs(w http.ResponseWriter, r *http.Request) {
 		log.Println("Пустой список идентификаторов URL")
 		http.Error(w, "пустой список идентификаторов URL", http.StatusBadRequest)
 		return
+	}
+
+	for i, r := range requestBody {
+		requestBody[i] = strings.Replace(r, baseURL, "", -1)
 	}
 
 	_ = h.storage.DeleteURLs(requestBody, h.auth.GetUserID())
