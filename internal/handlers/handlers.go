@@ -308,6 +308,8 @@ func (h *Handler) postLongURLinJSONbatch(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *Handler) deleteURLs(w http.ResponseWriter, r *http.Request) {
+	log.Println("Обработка запроса на удаление данных")
+
 	b, e := decodeRequest(r)
 	if e != nil {
 		log.Println("Неверный формат данных в запросе:", e)
@@ -322,6 +324,8 @@ func (h *Handler) deleteURLs(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "неверный формат данных в запросе: "+e.Error(), http.StatusBadRequest)
 		return
 	}
+
+	log.Println("Тело запроса на удаление данных:\n", requestBody)
 
 	if len(requestBody) == 0 {
 		log.Println("Пустой список идентификаторов URL")
