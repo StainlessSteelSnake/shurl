@@ -326,7 +326,7 @@ func (h *Handler) deleteURLs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Println("Тело запроса на удаление данных:\n", requestBody)
+	log.Fatalln("Тело запроса на удаление данных:\n", requestBody)
 
 	if len(requestBody) == 0 {
 		log.Println("Пустой список идентификаторов URL")
