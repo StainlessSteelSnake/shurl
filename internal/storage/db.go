@@ -211,19 +211,19 @@ func (s *databaseStorage) AddURL(l, user string) (string, error) {
 	s.locker.Lock()
 	defer s.locker.Unlock()
 
+	var pgErr *pgconn.PgError
 	ct, err := s.conn.Exec(s.ctx, queryInsert, sh, l, user)
-	if err != nil {
-		var pgErr *pgconn.PgError
-		if !errors.As(err, &pgErr) {
-			return "", err
-		}
+	if err != nil && !errors.As(err, &pgErr) {
+		return "", err
+	}
 
+	if err != nil && pgErr.Code != pgerrcode.UniqueViolation {
 		log.Println("Ошибка операции с БД, код:", pgErr.Code, ", сообщение:", pgErr.Error())
+		return "", err
+	}
 
-		if pgErr.Code != pgerrcode.UniqueViolation {
-			return "", err
-		}
-
+	if err != nil {
+		log.Println("Ошибка операции с БД, код:", pgErr.Code, ", сообщение:", pgErr.Error())
 		duplicateErr := NewStorageDBError(l, err)
 
 		r := s.conn.QueryRow(s.ctx, querySelectByLongURL, l)

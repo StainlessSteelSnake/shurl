@@ -93,9 +93,9 @@ func (h *Handler) getLongURL(w http.ResponseWriter, r *http.Request) {
 	sh := strings.Trim(r.URL.Path, "/")
 	log.Println("Идентификатор короткого URL, полученный из GET-запроса:", sh)
 
-	l, d, e := h.storage.FindURL(sh)
-	if e != nil {
-		log.Println("Ошибка '", e, "'. Не найден URL с указанным коротким идентификатором:", sh)
+	l, d, err := h.storage.FindURL(sh)
+	if err != nil {
+		log.Println("Ошибка '", err, "'. Не найден URL с указанным коротким идентификатором:", sh)
 		http.Error(w, "URL с указанным коротким идентификатором не найден", http.StatusBadRequest)
 		return
 	}
@@ -145,10 +145,10 @@ func (h *Handler) getLongURLsByUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) postLongURL(w http.ResponseWriter, r *http.Request) {
-	b, e := decodeRequest(r)
-	if e != nil {
-		log.Println("Неверный формат данных в запросе:", e)
-		http.Error(w, "неверный формат данных в запросе: "+e.Error(), http.StatusBadRequest)
+	b, err := decodeRequest(r)
+	if err != nil {
+		log.Println("Неверный формат данных в запросе:", err)
+		http.Error(w, "неверный формат данных в запросе: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -161,44 +161,40 @@ func (h *Handler) postLongURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var duplicateFound bool
-	sh, e := h.storage.AddURL(l, h.auth.GetUserID())
-	if e != nil {
-		if !strings.Contains(e.Error(), l) {
-			log.Println("Ошибка '", e, "' при добавлении в БД URL:", l)
-			http.Error(w, "ошибка при добавлении в БД: "+e.Error(), http.StatusInternalServerError)
-			return
-		}
-		duplicateFound = true
+	sh, err := h.storage.AddURL(l, h.auth.GetUserID())
+	if err != nil && !strings.Contains(err.Error(), l) {
+		log.Println("Ошибка '", err, "' при добавлении в БД URL:", l)
+		http.Error(w, "ошибка при добавлении в БД: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	if duplicateFound {
-		w.WriteHeader(http.StatusConflict)
+	if err != nil {
 		log.Println("Найденный короткий идентификатор URL:", sh)
+		w.WriteHeader(http.StatusConflict)
 	} else {
 		log.Println("Созданный короткий идентификатор URL:", sh)
 		w.WriteHeader(http.StatusCreated)
 	}
 
-	_, e = w.Write([]byte(baseURL + sh))
-	if e != nil {
-		log.Println("Ошибка при записи ответа в тело запроса:", e)
+	_, err = w.Write([]byte(baseURL + sh))
+	if err != nil {
+		log.Println("Ошибка при записи ответа в тело запроса:", err)
 	}
 }
 
 func (h *Handler) postLongURLinJSON(w http.ResponseWriter, r *http.Request) {
-	b, e := decodeRequest(r)
-	if e != nil {
-		log.Println("Неверный формат данных в запросе:", e)
-		http.Error(w, "неверный формат данных в запросе: "+e.Error(), http.StatusBadRequest)
+	b, err := decodeRequest(r)
+	if err != nil {
+		log.Println("Неверный формат данных в запросе:", err)
+		http.Error(w, "неверный формат данных в запросе: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	requestBody := PostRequestBody{}
-	e = json.Unmarshal(b, &requestBody)
-	if e != nil {
-		log.Println("Неверный формат данных в запросе:", e)
-		http.Error(w, "неверный формат данных в запросе: "+e.Error(), http.StatusBadRequest)
+	err = json.Unmarshal(b, &requestBody)
+	if err != nil {
+		log.Println("Неверный формат данных в запросе:", err)
+		http.Error(w, "неверный формат данных в запросе: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -210,22 +206,23 @@ func (h *Handler) postLongURLinJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var duplicateFound bool
-	sh, e := h.storage.AddURL(requestBody.URL, h.auth.GetUserID())
-	if e != nil {
+	sh, err := h.storage.AddURL(requestBody.URL, h.auth.GetUserID())
+	if err != nil && !strings.Contains(err.Error(), requestBody.URL) {
+		log.Println("Ошибка '", err, "' при добавлении в БД URL:", requestBody.URL)
+		http.Error(w, "ошибка при добавлении в БД: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-		if !strings.Contains(e.Error(), requestBody.URL) {
-			log.Println("Ошибка '", e, "' при добавлении в БД URL:", requestBody.URL)
-			http.Error(w, "ошибка при добавлении в БД: "+e.Error(), http.StatusInternalServerError)
-			return
-		}
+	if err != nil {
 		duplicateFound = true
 	}
+
 	log.Println("Созданный короткий идентификатор URL:", sh)
 
-	response, e := json.Marshal(PostResponseBody{baseURL + sh})
-	if e != nil {
-		log.Println("Ошибка '", e, "' при формировании ответа:", requestBody.URL)
-		http.Error(w, "ошибка при при формировании ответа: "+e.Error(), http.StatusInternalServerError)
+	response, err := json.Marshal(PostResponseBody{baseURL + sh})
+	if err != nil {
+		log.Println("Ошибка '", err, "' при формировании ответа:", requestBody.URL)
+		http.Error(w, "ошибка при при формировании ответа: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -236,9 +233,9 @@ func (h *Handler) postLongURLinJSON(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.WriteHeader(http.StatusCreated)
 	}
-	_, e = w.Write(response)
-	if e != nil {
-		log.Println("Ошибка при записи ответа в тело запроса:", e)
+	_, err = w.Write(response)
+	if err != nil {
+		log.Println("Ошибка при записи ответа в тело запроса:", err)
 	}
 }
 
@@ -254,18 +251,18 @@ func (h *Handler) ping(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) postLongURLinJSONbatch(w http.ResponseWriter, r *http.Request) {
-	b, e := decodeRequest(r)
-	if e != nil {
-		log.Println("Неверный формат данных в запросе:", e)
-		http.Error(w, "неверный формат данных в запросе: "+e.Error(), http.StatusBadRequest)
+	b, err := decodeRequest(r)
+	if err != nil {
+		log.Println("Неверный формат данных в запросе:", err)
+		http.Error(w, "неверный формат данных в запросе: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	requestBody := PostRequestBatch{}
-	e = json.Unmarshal(b, &requestBody)
-	if e != nil {
-		log.Println("Неверный формат данных в запросе:", e)
-		http.Error(w, "неверный формат данных в запросе: "+e.Error(), http.StatusBadRequest)
+	err = json.Unmarshal(b, &requestBody)
+	if err != nil {
+		log.Println("Неверный формат данных в запросе:", err)
+		http.Error(w, "неверный формат данных в запросе: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -280,10 +277,10 @@ func (h *Handler) postLongURLinJSONbatch(w http.ResponseWriter, r *http.Request)
 		longURLs = append(longURLs, [2]string{requestRecord.ID, requestRecord.URL})
 	}
 
-	shortURLs, e := h.storage.AddURLs(longURLs, h.auth.GetUserID())
-	if e != nil {
-		log.Println("Ошибка '", e, "' при добавлении в БД URLs:", longURLs)
-		http.Error(w, "ошибка при добавлении в БД URLs: "+e.Error(), http.StatusInternalServerError)
+	shortURLs, err := h.storage.AddURLs(longURLs, h.auth.GetUserID())
+	if err != nil {
+		log.Println("Ошибка '", err, "' при добавлении в БД URLs:", longURLs)
+		http.Error(w, "ошибка при добавлении в БД URLs: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -293,36 +290,36 @@ func (h *Handler) postLongURLinJSONbatch(w http.ResponseWriter, r *http.Request)
 		responseBody = append(responseBody, responseRecord)
 	}
 
-	response, e := json.Marshal(responseBody)
-	if e != nil {
-		log.Println("Ошибка '", e, "' при формировании ответа:", responseBody)
-		http.Error(w, "ошибка при при формировании ответа: "+e.Error(), http.StatusInternalServerError)
+	response, err := json.Marshal(responseBody)
+	if err != nil {
+		log.Println("Ошибка '", err, "' при формировании ответа:", responseBody)
+		http.Error(w, "ошибка при при формировании ответа: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	_, e = w.Write(response)
-	if e != nil {
-		log.Println("Ошибка при записи ответа в тело запроса:", e)
+	_, err = w.Write(response)
+	if err != nil {
+		log.Println("Ошибка при записи ответа в тело запроса:", err)
 	}
 }
 
 func (h *Handler) deleteURLs(w http.ResponseWriter, r *http.Request) {
 	log.Println("Обработка запроса на удаление данных")
 
-	b, e := decodeRequest(r)
-	if e != nil {
-		log.Println("Неверный формат данных в запросе:", e)
-		http.Error(w, "неверный формат данных в запросе: "+e.Error(), http.StatusBadRequest)
+	b, err := decodeRequest(r)
+	if err != nil {
+		log.Println("Неверный формат данных в запросе:", err)
+		http.Error(w, "неверный формат данных в запросе: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	requestBody := DeleteRequestBody{}
-	e = json.Unmarshal(b, &requestBody)
-	if e != nil {
-		log.Println("Неверный формат данных в запросе:", e)
-		http.Error(w, "неверный формат данных в запросе: "+e.Error(), http.StatusBadRequest)
+	err = json.Unmarshal(b, &requestBody)
+	if err != nil {
+		log.Println("Неверный формат данных в запросе:", err)
+		http.Error(w, "неверный формат данных в запросе: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
