@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"errors"
-	"github.com/StainlessSteelSnake/shurl/internal/auth"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/StainlessSteelSnake/shurl/internal/auth"
+	. "github.com/StainlessSteelSnake/shurl/internal/storage"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -38,10 +40,14 @@ func (s *storage) Ping() error {
 	return nil
 }
 
-func (s *storage) AddURLs(b [][2]string, user string) ([][2]string, error) {
+func (s *storage) CloseFunc() func() {
+	return nil
+}
+
+func (s *storage) AddURLs(b BatchURLs, user string) (BatchURLs, error) {
 	for _, record := range b {
-		s.container[record[1]] = record[1]
-		s.usersURLs[user] = append(s.usersURLs[user], record[1])
+		s.container[record.ID] = record.URL
+		s.usersURLs[user] = append(s.usersURLs[user], record.URL)
 
 	}
 	return b, nil

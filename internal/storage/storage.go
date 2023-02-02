@@ -11,11 +11,16 @@ import (
 	"time"
 )
 
-type batchURLs = [][2]string
+type RecordURL struct {
+	ID  string
+	URL string
+}
+
+type BatchURLs = []RecordURL
 
 type Storager interface {
 	AddURL(string, string) (string, error)
-	AddURLs(batchURLs, string) (batchURLs, error)
+	AddURLs(BatchURLs, string) (BatchURLs, error)
 	FindURL(string) (string, bool, error)
 	GetURLsByUser(string) []string
 	DeleteURLs([]string, string) []string
@@ -37,7 +42,7 @@ type memoryStorage struct {
 
 func NewStorage(filePath string, database string, ctx context.Context) Storager {
 	if database != "" {
-		return newDBStorage(newMemoryStorage(), database, ctx)
+		return newDBStorage(ctx, newMemoryStorage(), database)
 	}
 
 	if filePath != "" {
@@ -85,21 +90,18 @@ func (s *memoryStorage) AddURL(l, user string) (string, error) {
 	return sh, nil
 }
 
-func (s *memoryStorage) AddURLs(longURLs batchURLs, user string) (batchURLs, error) {
+func (s *memoryStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, error) {
 	s.locker.Lock()
 	defer s.locker.Unlock()
 
-	result := make(batchURLs, 0, len(longURLs))
+	result := make(BatchURLs, 0, len(longURLs))
 	for _, longURL := range longURLs {
-		id := longURL[0]
-		l := longURL[1]
-
-		sh, err := s.AddURL(l, user)
+		sh, err := s.AddURL(longURL.URL, user)
 		if err != nil {
 			return result[:0], err
 		}
 
-		result = append(result, [2]string{id, sh})
+		result = append(result, RecordURL{longURL.ID, sh})
 	}
 
 	return result, nil

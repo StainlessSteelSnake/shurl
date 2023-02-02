@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
+	"sync"
+
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"log"
-	"sync"
 )
 
 const txPreparedInsert = "shurl-insert"
@@ -17,7 +18,6 @@ const txPreparedDelete = "shurl-delete"
 type databaseStorage struct {
 	*memoryStorage
 	conn           *pgx.Conn
-	ctx            context.Context
 	deletionQueue  chan string
 	deletionCancel context.CancelFunc
 	errors         chan error
@@ -47,7 +47,7 @@ func (s *databaseStorage) DeleteURLs(shortURLs []string, user string) (deleted [
 }
 
 func (s *databaseStorage) deletionQueueProcess(ctx context.Context) chan error {
-	err := make(chan error)
+	errorChan := make(chan error)
 
 	go func(s *databaseStorage, ctx context.Context) {
 		deletionBatch := make([]string, DeletionBatchSize)
@@ -61,7 +61,10 @@ func (s *databaseStorage) deletionQueueProcess(ctx context.Context) chan error {
 				deletionBatch = append(deletionBatch, sh)
 
 				if len(deletionBatch) >= DeletionBatchSize {
-					s.delete(deletionBatch)
+					err := s.delete(ctx, deletionBatch)
+					if err != nil {
+						errorChan <- err
+					}
 					deletionBatch = deletionBatch[:0]
 				}
 
@@ -72,16 +75,19 @@ func (s *databaseStorage) deletionQueueProcess(ctx context.Context) chan error {
 					continue
 				}
 
-				s.delete(deletionBatch)
+				err := s.delete(ctx, deletionBatch)
+				if err != nil {
+					errorChan <- err
+				}
 				deletionBatch = deletionBatch[:0]
 			}
 		}
 	}(s, ctx)
 
-	return err
+	return errorChan
 }
 
-func (s *databaseStorage) errorProcess() {
+func (s *databaseStorage) errorProcess(ctx context.Context) {
 	go func() {
 		for {
 			select {
@@ -91,48 +97,46 @@ func (s *databaseStorage) errorProcess() {
 				}
 
 				log.Println(err)
-			case <-s.ctx.Done():
+			case <-ctx.Done():
 				return
 			}
 		}
 	}()
 }
 
-func (s *databaseStorage) delete(deletionBatch []string) {
+func (s *databaseStorage) delete(ctx context.Context, deletionBatch []string) error {
 	s.locker.Lock()
 	defer s.locker.Unlock()
 
-	tx, err := s.conn.Begin(s.ctx)
+	dbCtx, _ := context.WithCancel(ctx)
+	tx, err := s.conn.Begin(dbCtx)
 	if err != nil {
-		s.errors <- err
-		return
+		return err
 	}
 
-	defer tx.Rollback(s.ctx)
+	defer tx.Rollback(dbCtx)
 
-	_, err = tx.Prepare(s.ctx, txPreparedDelete, queryDelete)
+	_, err = tx.Prepare(dbCtx, txPreparedDelete, queryDelete)
 	if err != nil {
-		s.errors <- err
-		return
+		return err
 	}
 
 	for _, sh := range deletionBatch {
-		_, err = tx.Exec(s.ctx, txPreparedDelete, sh)
+		_, err = tx.Exec(dbCtx, txPreparedDelete, sh)
 		if err != nil {
-			s.errors <- err
-			return
+			return err
 		}
 	}
 
-	err = tx.Commit(s.ctx)
+	err = tx.Commit(dbCtx)
 	if err != nil {
-		s.errors <- err
-		return
+		return err
 	}
+	return nil
 }
 
-func newDBStorage(m *memoryStorage, database string, ctx context.Context) *databaseStorage {
-	storage := &databaseStorage{memoryStorage: m, conn: nil, ctx: ctx, deletionQueue: nil}
+func newDBStorage(ctx context.Context, m *memoryStorage, database string) *databaseStorage {
+	storage := &databaseStorage{memoryStorage: m, conn: nil, deletionQueue: nil}
 
 	var err error
 	storage.conn, err = pgx.Connect(ctx, database)
@@ -141,7 +145,7 @@ func newDBStorage(m *memoryStorage, database string, ctx context.Context) *datab
 		return storage
 	}
 
-	err = storage.init()
+	err = storage.init(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -156,14 +160,14 @@ func newDBStorage(m *memoryStorage, database string, ctx context.Context) *datab
 	return storage
 }
 
-func (s *databaseStorage) init() error {
+func (s *databaseStorage) init(ctx context.Context) error {
 
-	_, err := s.conn.Exec(s.ctx, queryCreateTable)
+	_, err := s.conn.Exec(ctx, queryCreateTable)
 	if err != nil {
 		return err
 	}
 
-	rows, err := s.conn.Query(s.ctx, querySelectAll)
+	rows, err := s.conn.Query(ctx, querySelectAll)
 	if err != nil {
 		return err
 	}
@@ -211,8 +215,9 @@ func (s *databaseStorage) AddURL(l, user string) (string, error) {
 	s.locker.Lock()
 	defer s.locker.Unlock()
 
+	ctx, _ := context.WithCancel(context.Background())
 	var pgErr *pgconn.PgError
-	ct, err := s.conn.Exec(s.ctx, queryInsert, sh, l, user)
+	ct, err := s.conn.Exec(ctx, queryInsert, sh, l, user)
 	if err != nil && !errors.As(err, &pgErr) {
 		return "", err
 	}
@@ -226,7 +231,7 @@ func (s *databaseStorage) AddURL(l, user string) (string, error) {
 		log.Println("Ошибка операции с БД, код:", pgErr.Code, ", сообщение:", pgErr.Error())
 		duplicateErr := NewStorageDBError(l, err)
 
-		r := s.conn.QueryRow(s.ctx, querySelectByLongURL, l)
+		r := s.conn.QueryRow(ctx, querySelectByLongURL, l)
 		err = r.Scan(&sh)
 		if err != nil {
 			return "", NewStorageDBError(l, err)
@@ -240,42 +245,40 @@ func (s *databaseStorage) AddURL(l, user string) (string, error) {
 	return sh, nil
 }
 
-func (s *databaseStorage) AddURLs(longURLs batchURLs, user string) (batchURLs, error) {
-	result := make(batchURLs, 0, len(longURLs))
+func (s *databaseStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, error) {
+	result := make(BatchURLs, 0, len(longURLs))
 
-	tx, err := s.conn.Begin(s.ctx)
+	ctx, _ := context.WithCancel(context.Background())
+	tx, err := s.conn.Begin(ctx)
 	if err != nil {
 		return result[:0], err
 	}
 
-	defer tx.Rollback(s.ctx)
+	defer tx.Rollback(ctx)
 
-	_, err = tx.Prepare(s.ctx, txPreparedInsert, queryInsert)
+	_, err = tx.Prepare(ctx, txPreparedInsert, queryInsert)
 	if err != nil {
 		return result[:0], err
 	}
 
 	for _, longURL := range longURLs {
-		id := longURL[0]
-		l := longURL[1]
-
-		sh, err := s.memoryStorage.AddURL(l, user)
+		sh, err := s.memoryStorage.AddURL(longURL.URL, user)
 		if err != nil {
 			return result[:0], err
 		}
 
-		_, err = tx.Exec(s.ctx, txPreparedInsert, sh, l, user)
+		_, err = tx.Exec(ctx, txPreparedInsert, sh, longURL.URL, user)
 		if err != nil {
 			return result[:0], err
 		}
 
-		result = append(result, [2]string{id, sh})
+		result = append(result, RecordURL{ID: longURL.ID, URL: sh})
 	}
 
 	s.locker.Lock()
 	defer s.locker.Unlock()
 
-	err = tx.Commit(s.ctx)
+	err = tx.Commit(ctx)
 	if err != nil {
 		return result[:0], err
 	}
@@ -293,7 +296,8 @@ func (s *databaseStorage) CloseFunc() func() {
 			return
 		}
 
-		err := s.conn.Close(s.ctx)
+		ctx, _ := context.WithCancel(context.Background())
+		err := s.conn.Close(ctx)
 		if err != nil {
 			log.Println(err)
 			return
@@ -305,5 +309,7 @@ func (s *databaseStorage) Ping() error {
 	if s.conn == nil {
 		return s.memoryStorage.Ping()
 	}
-	return s.conn.Ping(s.ctx)
+
+	ctx, _ := context.WithCancel(context.Background())
+	return s.conn.Ping(ctx)
 }

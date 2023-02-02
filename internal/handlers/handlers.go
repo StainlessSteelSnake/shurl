@@ -6,23 +6,16 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/StainlessSteelSnake/shurl/internal/storage"
+
 	"github.com/StainlessSteelSnake/shurl/internal/auth"
 
 	"github.com/go-chi/chi/v5"
 )
 
-type Storager interface {
-	AddURL(l, user string) (string, error)
-	AddURLs([][2]string, string) ([][2]string, error)
-	FindURL(sh string) (string, bool, error)
-	GetURLsByUser(string) []string
-	DeleteURLs([]string, string) []string
-	Ping() error
-}
-
 type Handler struct {
 	*chi.Mux
-	storage Storager
+	storage storage.Storager
 	auth    auth.Authenticator
 }
 
@@ -59,7 +52,7 @@ type shortAndLongURL struct {
 
 type shortAndLongURLs []shortAndLongURL
 
-func NewHandler(s Storager, bURL string) *Handler {
+func NewHandler(s storage.Storager, bURL string) *Handler {
 	baseURL = bURL
 	log.Println("Base URL:", baseURL)
 
@@ -272,9 +265,9 @@ func (h *Handler) postLongURLinJSONbatch(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var longURLs = make([][2]string, 0, len(requestBody))
+	var longURLs = make(storage.BatchURLs, 0, len(requestBody))
 	for _, requestRecord := range requestBody {
-		longURLs = append(longURLs, [2]string{requestRecord.ID, requestRecord.URL})
+		longURLs = append(longURLs, storage.RecordURL{ID: requestRecord.ID, URL: requestRecord.URL})
 	}
 
 	shortURLs, err := h.storage.AddURLs(longURLs, h.auth.GetUserID())
@@ -286,7 +279,7 @@ func (h *Handler) postLongURLinJSONbatch(w http.ResponseWriter, r *http.Request)
 
 	var responseBody = make(PostResponseBatch, 0, len(shortURLs))
 	for _, shortURL := range shortURLs {
-		responseRecord := PostResponseRecord{ID: shortURL[0], ShortURL: baseURL + shortURL[1]}
+		responseRecord := PostResponseRecord{ID: shortURL.ID, ShortURL: baseURL + shortURL.URL}
 		responseBody = append(responseBody, responseRecord)
 	}
 

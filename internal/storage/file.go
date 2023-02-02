@@ -107,23 +107,20 @@ func (s *fileStorage) AddURL(l, user string) (string, error) {
 	return sh, nil
 }
 
-func (s *fileStorage) AddURLs(longURLs batchURLs, user string) (batchURLs, error) {
-	result := make(batchURLs, 0, len(longURLs))
+func (s *fileStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, error) {
+	result := make(BatchURLs, 0, len(longURLs))
 	for _, longURL := range longURLs {
-		id := longURL[0]
-		l := longURL[1]
-
-		sh, err := s.AddURL(l, user)
+		sh, err := s.AddURL(longURL.URL, user)
 		if err != nil {
 			return result[:0], err
 		}
 
-		err = s.saveToFile(&Record{ShortURL: sh, LongURL: l, Deleted: false, UserID: user})
+		err = s.saveToFile(&Record{ShortURL: sh, LongURL: longURL.URL, Deleted: false, UserID: user})
 		if err != nil {
 			return result[:0], err
 		}
 
-		result = append(result, [2]string{id, sh})
+		result = append(result, RecordURL{ID: longURL.ID, URL: sh})
 	}
 
 	return result, nil
