@@ -108,27 +108,26 @@ func (s *databaseStorage) delete(ctx context.Context, deletionBatch []string) er
 	s.locker.Lock()
 	defer s.locker.Unlock()
 
-	dbCtx, _ := context.WithCancel(ctx)
-	tx, err := s.conn.Begin(dbCtx)
+	tx, err := s.conn.Begin(ctx)
 	if err != nil {
 		return err
 	}
 
-	defer tx.Rollback(dbCtx)
+	defer tx.Rollback(ctx)
 
-	_, err = tx.Prepare(dbCtx, txPreparedDelete, queryDelete)
+	_, err = tx.Prepare(ctx, txPreparedDelete, queryDelete)
 	if err != nil {
 		return err
 	}
 
 	for _, sh := range deletionBatch {
-		_, err = tx.Exec(dbCtx, txPreparedDelete, sh)
+		_, err = tx.Exec(ctx, txPreparedDelete, sh)
 		if err != nil {
 			return err
 		}
 	}
 
-	err = tx.Commit(dbCtx)
+	err = tx.Commit(ctx)
 	if err != nil {
 		return err
 	}
@@ -215,7 +214,7 @@ func (s *databaseStorage) AddURL(l, user string) (string, error) {
 	s.locker.Lock()
 	defer s.locker.Unlock()
 
-	ctx, _ := context.WithCancel(context.Background())
+	ctx := context.Background()
 	var pgErr *pgconn.PgError
 	ct, err := s.conn.Exec(ctx, queryInsert, sh, l, user)
 	if err != nil && !errors.As(err, &pgErr) {
@@ -248,7 +247,7 @@ func (s *databaseStorage) AddURL(l, user string) (string, error) {
 func (s *databaseStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, error) {
 	result := make(BatchURLs, 0, len(longURLs))
 
-	ctx, _ := context.WithCancel(context.Background())
+	ctx := context.Background()
 	tx, err := s.conn.Begin(ctx)
 	if err != nil {
 		return result[:0], err
@@ -296,7 +295,7 @@ func (s *databaseStorage) CloseFunc() func() {
 			return
 		}
 
-		ctx, _ := context.WithCancel(context.Background())
+		ctx := context.Background()
 		err := s.conn.Close(ctx)
 		if err != nil {
 			log.Println(err)
@@ -310,6 +309,6 @@ func (s *databaseStorage) Ping() error {
 		return s.memoryStorage.Ping()
 	}
 
-	ctx, _ := context.WithCancel(context.Background())
+	ctx := context.Background()
 	return s.conn.Ping(ctx)
 }
