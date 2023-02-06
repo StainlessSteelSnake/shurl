@@ -86,24 +86,24 @@ func (h *Handler) badRequest(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) getLongURL(w http.ResponseWriter, r *http.Request) {
 	log.Println("Полученный GET-запрос:", r.URL)
 
-	sh := strings.Trim(r.URL.Path, "/")
-	log.Println("Идентификатор короткого URL, полученный из GET-запроса:", sh)
+	shortURL := strings.Trim(r.URL.Path, "/")
+	log.Println("Идентификатор короткого URL, полученный из GET-запроса:", shortURL)
 
-	l, d, err := h.storage.FindURL(sh)
+	longURL, deleted, err := h.storage.FindURL(shortURL)
 	if err != nil {
-		log.Println("Ошибка '", err, "'. Не найден URL с указанным коротким идентификатором:", sh)
+		log.Println("Ошибка '", err, "'. Не найден URL с указанным коротким идентификатором:", shortURL)
 		http.Error(w, "URL с указанным коротким идентификатором не найден", http.StatusBadRequest)
 		return
 	}
 
-	if d {
-		log.Println("URL", l, "для короткого идентификатора", sh, "был удалён")
+	if deleted {
+		log.Println("URL", longURL, "для короткого идентификатора", shortURL, "был удалён")
 		w.WriteHeader(http.StatusGone)
 		return
 	}
 
-	log.Println("Найден URL", l, "для короткого идентификатора", sh)
-	w.Header().Set("Location", l)
+	log.Println("Найден URL", longURL, "для короткого идентификатора", shortURL)
+	w.Header().Set("Location", longURL)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
@@ -119,13 +119,13 @@ func (h *Handler) getLongURLsByUser(w http.ResponseWriter, r *http.Request) {
 	log.Println("Для пользователя с идентификатором '"+h.auth.GetUserID()+"' найдено ", len(urls), "сохранённых URL:")
 
 	response := make(shortAndLongURLs, 0)
-	for i, short := range urls {
-		long, _, err := h.storage.FindURL(short)
+	for i, shortURL := range urls {
+		longURL, _, err := h.storage.FindURL(shortURL)
 		if err != nil {
 			continue
 		}
 
-		record := shortAndLongURL{baseURL + short, long}
+		record := shortAndLongURL{baseURL + shortURL, longURL}
 		log.Println("Запись", i, "короткий URL", record.ShortURL, "длинный URL", record.LongURL)
 		response = append(response, record)
 	}
@@ -148,31 +148,31 @@ func (h *Handler) postLongURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	l := string(b)
-	log.Println("Пришедший в запросе исходный URL:", l)
-	if len(l) == 0 {
+	longURL := string(b)
+	log.Println("Пришедший в запросе исходный URL:", longURL)
+	if len(longURL) == 0 {
 		log.Println("Неверный формат URL")
 		http.Error(w, "неверный формат URL", http.StatusBadRequest)
 
 		return
 	}
 
-	sh, err := h.storage.AddURL(l, h.auth.GetUserID())
-	if err != nil && !strings.Contains(err.Error(), l) {
-		log.Println("Ошибка '", err, "' при добавлении в БД URL:", l)
+	shortURL, err := h.storage.AddURL(longURL, h.auth.GetUserID())
+	if err != nil && !strings.Contains(err.Error(), longURL) {
+		log.Println("Ошибка '", err, "' при добавлении в БД URL:", longURL)
 		http.Error(w, "ошибка при добавлении в БД: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	if err != nil {
-		log.Println("Найденный короткий идентификатор URL:", sh)
+		log.Println("Найденный короткий идентификатор URL:", shortURL)
 		w.WriteHeader(http.StatusConflict)
 	} else {
-		log.Println("Созданный короткий идентификатор URL:", sh)
+		log.Println("Созданный короткий идентификатор URL:", shortURL)
 		w.WriteHeader(http.StatusCreated)
 	}
 
-	_, err = w.Write([]byte(baseURL + sh))
+	_, err = w.Write([]byte(baseURL + shortURL))
 	if err != nil {
 		log.Println("Ошибка при записи ответа в тело запроса:", err)
 	}
@@ -202,7 +202,7 @@ func (h *Handler) postLongURLinJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var duplicateFound bool
-	sh, err := h.storage.AddURL(requestBody.URL, h.auth.GetUserID())
+	shortURL, err := h.storage.AddURL(requestBody.URL, h.auth.GetUserID())
 	if err != nil && !strings.Contains(err.Error(), requestBody.URL) {
 		log.Println("Ошибка '", err, "' при добавлении в БД URL:", requestBody.URL)
 		http.Error(w, "ошибка при добавлении в БД: "+err.Error(), http.StatusInternalServerError)
@@ -213,9 +213,9 @@ func (h *Handler) postLongURLinJSON(w http.ResponseWriter, r *http.Request) {
 		duplicateFound = true
 	}
 
-	log.Println("Созданный короткий идентификатор URL:", sh)
+	log.Println("Созданный короткий идентификатор URL:", shortURL)
 
-	response, err := json.Marshal(PostResponseBody{baseURL + sh})
+	response, err := json.Marshal(PostResponseBody{baseURL + shortURL})
 	if err != nil {
 		log.Println("Ошибка '", err, "' при формировании ответа:", requestBody.URL)
 		http.Error(w, "ошибка при при формировании ответа: "+err.Error(), http.StatusInternalServerError)
@@ -327,8 +327,8 @@ func (h *Handler) deleteURLs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for i, r := range requestBody {
-		requestBody[i] = strings.Replace(r, baseURL, "", -1)
+	for i, record := range requestBody {
+		requestBody[i] = strings.Replace(record, baseURL, "", -1)
 	}
 
 	log.Println("Список подлежащих удалению коротких идентификаторов URL:\n", requestBody)
