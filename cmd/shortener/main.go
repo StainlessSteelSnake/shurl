@@ -19,7 +19,7 @@ func main() {
 	if closeFunc := str.CloseFunc(); closeFunc != nil {
 		defer closeFunc()
 	}
-
+ 
 	h := handlers.NewHandler(str, cfg.BaseURL)
 
 	srv := server.NewServer(cfg.ServerAddress, h)
