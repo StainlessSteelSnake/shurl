@@ -28,9 +28,9 @@ func (s *dummyStorage) AddURL(l, user string) (string, error) {
 
 func (s *dummyStorage) FindURL(sh string) (storage.MemoryRecord, error) {
 	if l, ok := s.container[sh]; ok {
-		return storage.MemoryRecord{l, "", false}, nil
+		return storage.MemoryRecord{LongURL: l, User: "", Deleted: false}, nil
 	}
-	return storage.MemoryRecord{"", "", false}, errors.New("короткий URL с ID \" + string(sh) + \" не существует")
+	return storage.MemoryRecord{LongURL: "", User: "", Deleted: false}, errors.New("короткий URL с ID \" + string(sh) + \" не существует")
 }
 
 func (s *dummyStorage) GetURLsByUser(u string) []string {
