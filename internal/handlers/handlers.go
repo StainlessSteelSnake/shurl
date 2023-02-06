@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strings"
@@ -89,21 +90,21 @@ func (h *Handler) getLongURL(w http.ResponseWriter, r *http.Request) {
 	shortURL := strings.Trim(r.URL.Path, "/")
 	log.Println("Идентификатор короткого URL, полученный из GET-запроса:", shortURL)
 
-	longURL, deleted, err := h.storage.FindURL(shortURL)
+	result, err := h.storage.FindURL(shortURL)
 	if err != nil {
 		log.Println("Ошибка '", err, "'. Не найден URL с указанным коротким идентификатором:", shortURL)
 		http.Error(w, "URL с указанным коротким идентификатором не найден", http.StatusBadRequest)
 		return
 	}
 
-	if deleted {
-		log.Println("URL", longURL, "для короткого идентификатора", shortURL, "был удалён")
+	if result.Deleted {
+		log.Println("URL", result.LongURL, "для короткого идентификатора", shortURL, "был удалён")
 		w.WriteHeader(http.StatusGone)
 		return
 	}
 
-	log.Println("Найден URL", longURL, "для короткого идентификатора", shortURL)
-	w.Header().Set("Location", longURL)
+	log.Println("Найден URL", result.LongURL, "для короткого идентификатора", shortURL)
+	w.Header().Set("Location", result.LongURL)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
@@ -120,12 +121,12 @@ func (h *Handler) getLongURLsByUser(w http.ResponseWriter, r *http.Request) {
 
 	response := make(shortAndLongURLs, 0)
 	for i, shortURL := range urls {
-		longURL, _, err := h.storage.FindURL(shortURL)
+		result, err := h.storage.FindURL(shortURL)
 		if err != nil {
 			continue
 		}
 
-		record := shortAndLongURL{baseURL + shortURL, longURL}
+		record := shortAndLongURL{baseURL + shortURL, result.LongURL}
 		log.Println("Запись", i, "короткий URL", record.ShortURL, "длинный URL", record.LongURL)
 		response = append(response, record)
 	}
@@ -158,7 +159,7 @@ func (h *Handler) postLongURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	shortURL, err := h.storage.AddURL(longURL, h.auth.GetUserID())
-	if err != nil && !strings.Contains(err.Error(), longURL) {
+	if err != nil && errors.Is(err, storage.DBError{LongURL: longURL, Err: nil}) {
 		log.Println("Ошибка '", err, "' при добавлении в БД URL:", longURL)
 		http.Error(w, "ошибка при добавлении в БД: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -203,7 +204,7 @@ func (h *Handler) postLongURLinJSON(w http.ResponseWriter, r *http.Request) {
 
 	var duplicateFound bool
 	shortURL, err := h.storage.AddURL(requestBody.URL, h.auth.GetUserID())
-	if err != nil && !strings.Contains(err.Error(), requestBody.URL) {
+	if err != nil && errors.Is(err, storage.DBError{LongURL: requestBody.URL, Err: nil}) {
 		log.Println("Ошибка '", err, "' при добавлении в БД URL:", requestBody.URL)
 		http.Error(w, "ошибка при добавлении в БД: "+err.Error(), http.StatusInternalServerError)
 		return

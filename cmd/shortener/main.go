@@ -15,7 +15,7 @@ func main() {
 
 	ctx := context.Background()
 
-	str := storage.NewStorage(cfg.FileStoragePath, cfg.DatabaseDSN, ctx)
+	str := storage.NewStorage(ctx, cfg.FileStoragePath, cfg.DatabaseDSN)
 	if closeFunc := str.CloseFunc(); closeFunc != nil {
 		defer closeFunc()
 	}

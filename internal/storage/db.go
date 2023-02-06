@@ -4,12 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
-	"sync"
-
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"log"
 )
 
 const txPreparedInsert = "shurl-insert"
@@ -17,11 +15,7 @@ const txPreparedDelete = "shurl-delete"
 
 type databaseStorage struct {
 	*memoryStorage
-	conn           *pgx.Conn
-	deletionQueue  chan string
-	deletionCancel context.CancelFunc
-	errors         chan error
-	locker         sync.Mutex
+	conn *pgx.Conn
 }
 
 type DBError struct {
@@ -29,79 +23,8 @@ type DBError struct {
 	Err     error
 }
 
-const DeletionBatchSize = 20
-const DeletionQueueSize = DeletionBatchSize * 2
-
-func (s *databaseStorage) DeleteURLs(shortURLs []string, user string) (deleted []string) {
-	deleted = make([]string, 0)
-
-	go func() {
-		deleted = s.memoryStorage.DeleteURLs(shortURLs, user)
-
-		for _, sh := range deleted {
-			s.deletionQueue <- sh
-		}
-	}()
-
-	return deleted
-}
-
-func (s *databaseStorage) deletionQueueProcess(ctx context.Context) chan error {
-	errorChan := make(chan error)
-
-	go func(s *databaseStorage, ctx context.Context) {
-		deletionBatch := make([]string, DeletionBatchSize)
-		for {
-			select {
-			case sh, ok := <-s.deletionQueue:
-				if !ok {
-					return
-				}
-
-				deletionBatch = append(deletionBatch, sh)
-
-				if len(deletionBatch) >= DeletionBatchSize {
-					err := s.delete(ctx, deletionBatch)
-					if err != nil {
-						errorChan <- err
-					}
-					deletionBatch = deletionBatch[:0]
-				}
-
-			case <-ctx.Done():
-				return
-			default:
-				if len(deletionBatch) == 0 {
-					continue
-				}
-
-				err := s.delete(ctx, deletionBatch)
-				if err != nil {
-					errorChan <- err
-				}
-				deletionBatch = deletionBatch[:0]
-			}
-		}
-	}(s, ctx)
-
-	return errorChan
-}
-
-func (s *databaseStorage) errorProcess(ctx context.Context) {
-	go func() {
-		for {
-			select {
-			case err, ok := <-s.errors:
-				if !ok {
-					return
-				}
-
-				log.Println(err)
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
+func (s *databaseStorage) deletionQueueProcess(ctx context.Context) {
+	go deletionQueueProcess(ctx, s, s.memoryStorage.deletionQueue)
 }
 
 func (s *databaseStorage) delete(ctx context.Context, deletionBatch []string) error {
@@ -131,11 +54,12 @@ func (s *databaseStorage) delete(ctx context.Context, deletionBatch []string) er
 	if err != nil {
 		return err
 	}
-	return nil
+
+	return s.memoryStorage.delete(ctx, deletionBatch)
 }
 
 func newDBStorage(ctx context.Context, m *memoryStorage, database string) *databaseStorage {
-	storage := &databaseStorage{memoryStorage: m, conn: nil, deletionQueue: nil}
+	storage := &databaseStorage{memoryStorage: m, conn: nil}
 
 	var err error
 	storage.conn, err = pgx.Connect(ctx, database)
@@ -148,13 +72,6 @@ func newDBStorage(ctx context.Context, m *memoryStorage, database string) *datab
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	storage.deletionQueue = make(chan string, DeletionQueueSize)
-
-	var deletionCtx context.Context
-	deletionCtx, storage.deletionCancel = context.WithCancel(ctx)
-
-	storage.errors = storage.deletionQueueProcess(deletionCtx)
 
 	return storage
 }
@@ -181,7 +98,7 @@ func (s *databaseStorage) init(ctx context.Context) error {
 			log.Println("Ошибка чтения из БД:", err)
 		}
 
-		s.memoryStorage.container[sh] = memoryRecord{longURL: l, deleted: d, user: u}
+		s.memoryStorage.container[sh] = MemoryRecord{LongURL: l, Deleted: d, User: u}
 		s.memoryStorage.usersURLs[u] = append(s.memoryStorage.usersURLs[u], sh)
 	}
 
@@ -194,8 +111,21 @@ func (s *databaseStorage) init(ctx context.Context) error {
 	return nil
 }
 
-func (e *DBError) Error() string {
+func (e DBError) Error() string {
 	return fmt.Sprintf("Найден дубликат для полного URL: %v. Ошибка добавления в БД: %v", e.LongURL, e.Err)
+}
+
+func (e DBError) Is(target error) bool {
+	err, ok := target.(DBError)
+	if !ok {
+		return false
+	}
+
+	if err.LongURL != e.LongURL {
+		return false
+	}
+
+	return true
 }
 
 func NewStorageDBError(longURL string, err error) error {
@@ -289,7 +219,7 @@ func (s *databaseStorage) CloseFunc() func() {
 	return func() {
 		s.deletionCancel()
 		close(s.deletionQueue)
-		close(s.errors)
+		//close(s.errors)
 
 		if s.conn == nil {
 			return

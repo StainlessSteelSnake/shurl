@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -25,11 +26,11 @@ func (s *dummyStorage) AddURL(l, user string) (string, error) {
 	return l, nil
 }
 
-func (s *dummyStorage) FindURL(sh string) (string, bool, error) {
+func (s *dummyStorage) FindURL(sh string) (storage.MemoryRecord, error) {
 	if l, ok := s.container[sh]; ok {
-		return l, false, nil
+		return storage.MemoryRecord{l, "", false}, nil
 	}
-	return "", false, errors.New("короткий URL с ID \" + string(sh) + \" не существует")
+	return storage.MemoryRecord{"", "", false}, errors.New("короткий URL с ID \" + string(sh) + \" не существует")
 }
 
 func (s *dummyStorage) GetURLsByUser(u string) []string {
@@ -55,6 +56,10 @@ func (s *dummyStorage) AddURLs(b storage.BatchURLs, user string) (storage.BatchU
 
 func (s *dummyStorage) DeleteURLs(urls []string, user string) []string {
 	return urls
+}
+
+func (s *dummyStorage) deletionQueueProcess(ctx context.Context) {
+
 }
 
 func TestGzipWriter_Write(t *testing.T) {
