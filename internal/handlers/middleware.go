@@ -17,11 +17,11 @@ func (w gzipWriter) Write(b []byte) (int, error) {
 	return w.Writer.Write(b)
 }
 
-func gzipHandler(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func gzipHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 			log.Println("Клиент не принимает ответы в gzip")
-			next(w, r)
+			next.ServeHTTP(w, r)
 			return
 		}
 
@@ -35,7 +35,7 @@ func gzipHandler(next http.HandlerFunc) http.HandlerFunc {
 
 		w.Header().Set("Content-Encoding", "gzip")
 		next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: gz}, r)
-	}
+	})
 }
 
 func decodeRequest(r *http.Request) ([]byte, error) {

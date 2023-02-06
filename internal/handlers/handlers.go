@@ -63,13 +63,16 @@ func NewHandler(s storage.Storager, bURL string) *Handler {
 	}
 
 	handler.Route("/", func(r chi.Router) {
-		r.Get("/{id}", handler.auth.Authenticate(gzipHandler(handler.getLongURL)))
-		r.Get("/api/user/urls", handler.auth.Authenticate(gzipHandler(handler.getLongURLsByUser)))
+		handler.Use(handler.auth.Authenticate)
+		handler.Use(gzipHandler)
+
+		r.Get("/{id}", handler.getLongURL)
+		r.Get("/api/user/urls", handler.getLongURLsByUser)
 		r.Get("/ping", handler.ping)
-		r.Post("/", handler.auth.Authenticate(gzipHandler(handler.postLongURL)))
-		r.Post("/api/shorten", handler.auth.Authenticate(gzipHandler(handler.postLongURLinJSON)))
-		r.Post("/api/shorten/batch", handler.auth.Authenticate(gzipHandler(handler.postLongURLinJSONbatch)))
-		r.Delete("/api/user/urls", handler.auth.Authenticate(gzipHandler(handler.deleteURLs)))
+		r.Post("/", handler.postLongURL)
+		r.Post("/api/shorten", handler.postLongURLinJSON)
+		r.Post("/api/shorten/batch", handler.postLongURLinJSONbatch)
+		r.Delete("/api/user/urls", handler.deleteURLs)
 		r.MethodNotAllowed(handler.badRequest)
 	})
 

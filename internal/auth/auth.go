@@ -21,7 +21,7 @@ type authentication struct {
 }
 
 type Authenticator interface {
-	Authenticate(http.HandlerFunc) http.HandlerFunc
+	Authenticate(http.Handler) http.Handler
 	GetUserID() string
 }
 
@@ -110,8 +110,8 @@ func (a *authentication) authExisting(cookie string) error {
 	return nil
 }
 
-func (a *authentication) Authenticate(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func (a *authentication) Authenticate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if a == nil {
 			return
 		}
@@ -143,8 +143,8 @@ func (a *authentication) Authenticate(next http.HandlerFunc) http.HandlerFunc {
 			http.SetCookie(w, &http.Cookie{Name: cookieAuthentication, Value: a.cookieFull})
 		}
 
-		next(w, r)
-	}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (a *authentication) GetUserID() string {
