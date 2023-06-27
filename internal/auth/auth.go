@@ -116,10 +116,11 @@ func (a *authentication) Authenticate(next http.Handler) http.Handler {
 			return
 		}
 
+		a.userID = ""
+		a.cookieFull = ""
+
 		cookie, err := r.Cookie(cookieAuthentication)
 		if err != nil {
-			a.cookieFull = ""
-			a.userID = ""
 			log.Println("Cookie '" + cookieAuthentication + "' не переданы")
 		}
 
@@ -128,7 +129,7 @@ func (a *authentication) Authenticate(next http.Handler) http.Handler {
 			err = a.authExisting(cookie.Value)
 		}
 		if err != nil {
-			log.Println("Ошибка при чтении cookie:", err)
+			log.Println("Ошибка при аутентификации пользователя через cookie 'authentication':", err)
 		}
 
 		err = nil

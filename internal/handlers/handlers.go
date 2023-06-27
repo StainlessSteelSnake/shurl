@@ -228,7 +228,7 @@ func (h *Handler) postLongURLinJSON(w http.ResponseWriter, r *http.Request) {
 	if duplicateFound {
 		w.WriteHeader(http.StatusConflict)
 	} else {
-		w.WriteHeader(http.StatusCreated)
+		w.WriteHeader(http.StatusOK)
 	}
 	_, err = w.Write(response)
 	if err != nil {
