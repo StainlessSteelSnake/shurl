@@ -79,7 +79,12 @@ func NewStorage(ctx context.Context, filePath string, database string) Storager 
 }
 
 func newMemoryStorage() *memoryStorage {
-	return &memoryStorage{map[string]MemoryRecord{}, map[string][]string{}, sync.RWMutex{}, make(chan string, DeletionQueueSize), nil}
+	return &memoryStorage{
+		container:      map[string]MemoryRecord{},
+		usersURLs:      map[string][]string{},
+		deletionQueue:  make(chan string, DeletionQueueSize),
+		deletionCancel: nil,
+	}
 }
 
 func generateShortURL() (string, error) {
@@ -99,6 +104,9 @@ func generateShortURL() (string, error) {
 }
 
 func (s *memoryStorage) AddURL(l, user string) (string, error) {
+	s.locker.Lock()
+	defer s.locker.Unlock()
+
 	sh, err := generateShortURL()
 	if err != nil {
 		return "", err
@@ -108,8 +116,6 @@ func (s *memoryStorage) AddURL(l, user string) (string, error) {
 		return "", errors.New("короткий URL с ID " + string(sh) + " уже существует")
 	}
 
-	//s.locker.Lock()
-	//defer s.locker.Unlock()
 	s.container[sh] = MemoryRecord{LongURL: l, Deleted: false, User: user}
 	s.usersURLs[user] = append(s.usersURLs[user], sh)
 	return sh, nil
@@ -182,8 +188,8 @@ func (s *memoryStorage) DeleteURLs(shortURLs []string, user string) (deleted []s
 }
 
 func (s *memoryStorage) delete(ctx context.Context, deletionBatch []string) error {
-	s.locker.Lock()
-	defer s.locker.Unlock()
+	//s.locker.Lock()
+	//defer s.locker.Unlock()
 
 	for _, shortURL := range deletionBatch {
 		mr := s.container[shortURL]
