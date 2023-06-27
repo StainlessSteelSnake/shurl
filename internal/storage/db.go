@@ -136,13 +136,15 @@ func NewStorageDBError(longURL string, err error) error {
 }
 
 func (s *databaseStorage) AddURL(l, user string) (string, error) {
+	log.Println(l, user)
+
 	sh, err := s.memoryStorage.AddURL(l, user)
 	if err != nil {
 		return "", err
 	}
 
-	s.locker.Lock()
-	defer s.locker.Unlock()
+	//s.locker.Lock()
+	//defer s.locker.Unlock()
 
 	ctx := context.Background()
 	var pgErr *pgconn.PgError

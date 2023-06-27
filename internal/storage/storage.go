@@ -99,9 +99,6 @@ func generateShortURL() (string, error) {
 }
 
 func (s *memoryStorage) AddURL(l, user string) (string, error) {
-	s.locker.Lock()
-	defer s.locker.Unlock()
-
 	sh, err := generateShortURL()
 	if err != nil {
 		return "", err
@@ -111,6 +108,8 @@ func (s *memoryStorage) AddURL(l, user string) (string, error) {
 		return "", errors.New("короткий URL с ID " + string(sh) + " уже существует")
 	}
 
+	//s.locker.Lock()
+	//defer s.locker.Unlock()
 	s.container[sh] = MemoryRecord{LongURL: l, Deleted: false, User: user}
 	s.usersURLs[user] = append(s.usersURLs[user], sh)
 	return sh, nil
