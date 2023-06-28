@@ -75,6 +75,8 @@ func NewHandler(s Storager, bURL string) *Handler {
 		r.MethodNotAllowed(handler.badRequest)
 	})
 
+	handler.Mux.Handle("/debug/pprof/*", http.DefaultServeMux)
+
 	return handler
 }
 
