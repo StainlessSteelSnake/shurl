@@ -19,8 +19,9 @@ type databaseStorage struct {
 }
 
 type DBError struct {
-	LongURL string
-	Err     error
+	LongURL   string
+	Duplicate bool
+	Err       error
 }
 
 func (s *databaseStorage) deletionQueueProcess(ctx context.Context) {
@@ -121,17 +122,18 @@ func (e DBError) Is(target error) bool {
 		return false
 	}
 
-	if err.LongURL != e.LongURL {
+	if err.LongURL != e.LongURL || err.Duplicate != e.Duplicate {
 		return false
 	}
 
 	return true
 }
 
-func NewStorageDBError(longURL string, err error) error {
+func NewStorageDBError(longURL string, duplicate bool, err error) error {
 	return &DBError{
-		LongURL: longURL,
-		Err:     err,
+		LongURL:   longURL,
+		Duplicate: duplicate,
+		Err:       err,
 	}
 }
 
@@ -159,12 +161,12 @@ func (s *databaseStorage) AddURL(l, user string) (string, error) {
 
 	if err != nil {
 		log.Println("Ошибка операции с БД, код:", pgErr.Code, ", сообщение:", pgErr.Error())
-		duplicateErr := NewStorageDBError(l, err)
+		duplicateErr := NewStorageDBError(l, true, err)
 
 		r := s.conn.QueryRow(ctx, querySelectByLongURL, l)
 		err = r.Scan(&sh)
 		if err != nil {
-			return "", NewStorageDBError(l, err)
+			return "", NewStorageDBError(l, false, err)
 		}
 
 		log.Println("Найдена ранее сохранённая запись")
