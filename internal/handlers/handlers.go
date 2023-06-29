@@ -7,9 +7,10 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/StainlessSteelSnake/shurl/internal/auth"
 	"github.com/StainlessSteelSnake/shurl/internal/storage"
-	"github.com/go-chi/chi/v5"
 )
 
 type Handler struct {

@@ -1,10 +1,9 @@
 package main
 
 import (
-	_ "net/http/pprof"
-
 	"context"
 	"log"
+	_ "net/http/pprof"
 
 	"github.com/StainlessSteelSnake/shurl/internal/config"
 	"github.com/StainlessSteelSnake/shurl/internal/handlers"
