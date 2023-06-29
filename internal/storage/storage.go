@@ -32,7 +32,7 @@ type Storager interface {
 }
 
 type deleter interface {
-	deletionQueueProcess(context.Context)
+	DeletionQueueProcess(context.Context)
 	delete(context.Context, []string) error
 }
 
@@ -42,12 +42,12 @@ type MemoryRecord struct {
 	Deleted bool
 }
 
-type memoryStorage struct {
+type MemoryStorage struct {
 	container      map[string]MemoryRecord
 	usersURLs      map[string][]string
 	locker         sync.RWMutex
 	deletionQueue  chan string
-	deletionCancel context.CancelFunc
+	DeletionCancel context.CancelFunc
 }
 
 func NewStorage(ctx context.Context, filePath string, database string) Storager {
@@ -57,33 +57,33 @@ func NewStorage(ctx context.Context, filePath string, database string) Storager 
 
 	switch {
 	case database != "":
-		dStorage := newDBStorage(ctx, newMemoryStorage(), database)
-		dStorage.deletionCancel = deletionCancel
-		dStorage.deletionQueueProcess(deletionContext)
+		dStorage := NewDBStorage(ctx, NewMemoryStorage(), database)
+		dStorage.DeletionCancel = deletionCancel
+		dStorage.DeletionQueueProcess(deletionContext)
 		storage = dStorage
 
 	case filePath != "":
-		fStorage := newFileStorage(newMemoryStorage(), filePath)
-		fStorage.deletionCancel = deletionCancel
-		fStorage.deletionQueueProcess(deletionContext)
+		fStorage := newFileStorage(NewMemoryStorage(), filePath)
+		fStorage.DeletionCancel = deletionCancel
+		fStorage.DeletionQueueProcess(deletionContext)
 		storage = fStorage
 
 	default:
-		mStorage := newMemoryStorage()
-		mStorage.deletionCancel = deletionCancel
-		mStorage.deletionQueueProcess(deletionContext)
+		mStorage := NewMemoryStorage()
+		mStorage.DeletionCancel = deletionCancel
+		mStorage.DeletionQueueProcess(deletionContext)
 		storage = mStorage
 	}
 
 	return storage
 }
 
-func newMemoryStorage() *memoryStorage {
-	return &memoryStorage{
+func NewMemoryStorage() *MemoryStorage {
+	return &MemoryStorage{
 		container:      map[string]MemoryRecord{},
 		usersURLs:      map[string][]string{},
 		deletionQueue:  make(chan string, DeletionQueueSize),
-		deletionCancel: nil,
+		DeletionCancel: nil,
 	}
 }
 
@@ -103,7 +103,7 @@ func generateShortURL() (string, error) {
 	return result, nil
 }
 
-func (s *memoryStorage) AddURL(l, user string) (string, error) {
+func (s *MemoryStorage) AddURL(l, user string) (string, error) {
 	s.locker.Lock()
 	defer s.locker.Unlock()
 
@@ -121,7 +121,7 @@ func (s *memoryStorage) AddURL(l, user string) (string, error) {
 	return sh, nil
 }
 
-func (s *memoryStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, error) {
+func (s *MemoryStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, error) {
 	s.locker.Lock()
 	defer s.locker.Unlock()
 
@@ -138,7 +138,7 @@ func (s *memoryStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, err
 	return result, nil
 }
 
-func (s *memoryStorage) FindURL(sh string) (MemoryRecord, error) {
+func (s *MemoryStorage) FindURL(sh string) (MemoryRecord, error) {
 	s.locker.RLock()
 	defer s.locker.RUnlock()
 
@@ -150,22 +150,22 @@ func (s *memoryStorage) FindURL(sh string) (MemoryRecord, error) {
 	return result, nil
 }
 
-func (s *memoryStorage) GetURLsByUser(u string) []string {
+func (s *MemoryStorage) GetURLsByUser(u string) []string {
 	s.locker.RLock()
 	defer s.locker.RUnlock()
 
 	return s.usersURLs[u]
 }
 
-func (s *memoryStorage) CloseFunc() func() {
+func (s *MemoryStorage) CloseFunc() func() {
 	return nil
 }
 
-func (s *memoryStorage) Ping() error {
+func (s *MemoryStorage) Ping() error {
 	return errors.New("БД не была подключена, используется хранилище в памяти")
 }
 
-func (s *memoryStorage) DeleteURLs(shortURLs []string, user string) (deleted []string) {
+func (s *MemoryStorage) DeleteURLs(shortURLs []string, user string) (deleted []string) {
 	go func() {
 		s.locker.RLock()
 		defer s.locker.RUnlock()
@@ -187,7 +187,7 @@ func (s *memoryStorage) DeleteURLs(shortURLs []string, user string) (deleted []s
 	return deleted
 }
 
-func (s *memoryStorage) delete(ctx context.Context, deletionBatch []string) error {
+func (s *MemoryStorage) delete(ctx context.Context, deletionBatch []string) error {
 	//s.locker.Lock()
 	//defer s.locker.Unlock()
 
@@ -200,7 +200,7 @@ func (s *memoryStorage) delete(ctx context.Context, deletionBatch []string) erro
 	return nil
 }
 
-func (s *memoryStorage) deletionQueueProcess(ctx context.Context) {
+func (s *MemoryStorage) DeletionQueueProcess(ctx context.Context) {
 	go deletionQueueProcess(ctx, s, s.deletionQueue)
 }
 

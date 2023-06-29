@@ -13,8 +13,8 @@ import (
 const txPreparedInsert = "shurl-insert"
 const txPreparedDelete = "shurl-delete"
 
-type databaseStorage struct {
-	*memoryStorage
+type DatabaseStorage struct {
+	*MemoryStorage
 	conn *pgx.Conn
 }
 
@@ -24,11 +24,11 @@ type DBError struct {
 	Err       error
 }
 
-func (s *databaseStorage) deletionQueueProcess(ctx context.Context) {
-	go deletionQueueProcess(ctx, s, s.memoryStorage.deletionQueue)
+func (s *DatabaseStorage) DeletionQueueProcess(ctx context.Context) {
+	go deletionQueueProcess(ctx, s, s.MemoryStorage.deletionQueue)
 }
 
-func (s *databaseStorage) delete(ctx context.Context, deletionBatch []string) error {
+func (s *DatabaseStorage) delete(ctx context.Context, deletionBatch []string) error {
 	s.locker.Lock()
 	defer s.locker.Unlock()
 
@@ -56,11 +56,11 @@ func (s *databaseStorage) delete(ctx context.Context, deletionBatch []string) er
 		return err
 	}
 
-	return s.memoryStorage.delete(ctx, deletionBatch)
+	return s.MemoryStorage.delete(ctx, deletionBatch)
 }
 
-func newDBStorage(ctx context.Context, m *memoryStorage, database string) *databaseStorage {
-	storage := &databaseStorage{memoryStorage: m, conn: nil}
+func NewDBStorage(ctx context.Context, m *MemoryStorage, database string) *DatabaseStorage {
+	storage := &DatabaseStorage{MemoryStorage: m, conn: nil}
 
 	var err error
 	storage.conn, err = pgx.Connect(ctx, database)
@@ -77,7 +77,7 @@ func newDBStorage(ctx context.Context, m *memoryStorage, database string) *datab
 	return storage
 }
 
-func (s *databaseStorage) init(ctx context.Context) error {
+func (s *DatabaseStorage) init(ctx context.Context) error {
 
 	_, err := s.conn.Exec(ctx, queryCreateTable)
 	if err != nil {
@@ -99,8 +99,8 @@ func (s *databaseStorage) init(ctx context.Context) error {
 			log.Println("Ошибка чтения из БД:", err)
 		}
 
-		s.memoryStorage.container[sh] = MemoryRecord{LongURL: l, Deleted: d, User: u}
-		s.memoryStorage.usersURLs[u] = append(s.memoryStorage.usersURLs[u], sh)
+		s.MemoryStorage.container[sh] = MemoryRecord{LongURL: l, Deleted: d, User: u}
+		s.MemoryStorage.usersURLs[u] = append(s.MemoryStorage.usersURLs[u], sh)
 	}
 
 	err = rows.Err()
@@ -137,9 +137,9 @@ func NewStorageDBError(longURL string, duplicate bool, err error) error {
 	}
 }
 
-func (s *databaseStorage) AddURL(l, user string) (string, error) {
+func (s *DatabaseStorage) AddURL(l, user string) (string, error) {
 
-	sh, err := s.memoryStorage.AddURL(l, user)
+	sh, err := s.MemoryStorage.AddURL(l, user)
 	if err != nil {
 		return "", err
 	}
@@ -177,7 +177,7 @@ func (s *databaseStorage) AddURL(l, user string) (string, error) {
 	return sh, nil
 }
 
-func (s *databaseStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, error) {
+func (s *DatabaseStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, error) {
 	result := make(BatchURLs, 0, len(longURLs))
 
 	ctx := context.Background()
@@ -194,7 +194,7 @@ func (s *databaseStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, e
 	}
 
 	for _, longURL := range longURLs {
-		sh, err := s.memoryStorage.AddURL(longURL.URL, user)
+		sh, err := s.MemoryStorage.AddURL(longURL.URL, user)
 		if err != nil {
 			return result[:0], err
 		}
@@ -218,9 +218,9 @@ func (s *databaseStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, e
 	return result, nil
 }
 
-func (s *databaseStorage) CloseFunc() func() {
+func (s *DatabaseStorage) CloseFunc() func() {
 	return func() {
-		s.deletionCancel()
+		s.DeletionCancel()
 		close(s.deletionQueue)
 		//close(s.errors)
 
@@ -237,9 +237,9 @@ func (s *databaseStorage) CloseFunc() func() {
 	}
 }
 
-func (s *databaseStorage) Ping() error {
+func (s *DatabaseStorage) Ping() error {
 	if s.conn == nil {
-		return s.memoryStorage.Ping()
+		return s.MemoryStorage.Ping()
 	}
 
 	ctx := context.Background()

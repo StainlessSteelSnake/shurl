@@ -7,7 +7,7 @@ import (
 )
 
 type fileStorage struct {
-	*memoryStorage
+	*MemoryStorage
 	file    *os.File
 	decoder *json.Decoder
 	encoder *json.Encoder
@@ -20,7 +20,7 @@ type Record struct {
 	UserID   string `json:"user_id"`
 }
 
-func newFileStorage(m *memoryStorage, filePath string) *fileStorage {
+func newFileStorage(m *MemoryStorage, filePath string) *fileStorage {
 	storage := &fileStorage{m, nil, nil, nil}
 
 	if filePath == "" {
@@ -94,7 +94,7 @@ func (s *fileStorage) saveToFile(r *Record) error {
 }
 
 func (s *fileStorage) AddURL(l, user string) (string, error) {
-	sh, err := s.memoryStorage.AddURL(l, user)
+	sh, err := s.MemoryStorage.AddURL(l, user)
 	if err != nil {
 		return "", err
 	}
@@ -127,7 +127,7 @@ func (s *fileStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, error
 }
 
 func (s *fileStorage) DeleteURLs(shortURLs []string, user string) (deleted []string) {
-	deleted = s.memoryStorage.DeleteURLs(shortURLs, user)
+	deleted = s.MemoryStorage.DeleteURLs(shortURLs, user)
 
 	for _, sh := range deleted {
 		err := s.saveToFile(&Record{ShortURL: sh, LongURL: s.container[sh].LongURL, Deleted: true, UserID: user})
