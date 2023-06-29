@@ -63,6 +63,8 @@ func NewHandler(s storage.Storager, bURL string) *Handler {
 		auth.NewAuth(),
 	}
 
+	handler.Mux.Handle("/debug/pprof/*", http.DefaultServeMux)
+
 	handler.Route("/", func(r chi.Router) {
 		handler.Use(handler.auth.Authenticate)
 		handler.Use(gzipHandler)
@@ -76,8 +78,6 @@ func NewHandler(s storage.Storager, bURL string) *Handler {
 		r.Delete("/api/user/urls", handler.deleteURLs)
 		r.MethodNotAllowed(handler.badRequest)
 	})
-
-	handler.Mux.Handle("/debug/pprof/*", http.DefaultServeMux)
 
 	return handler
 }
