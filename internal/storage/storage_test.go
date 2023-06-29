@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -66,7 +67,7 @@ func Test_newFileStorage(t *testing.T) {
 func Test_memoryStorage_AddURL(t *testing.T) {
 	tests := []struct {
 		name       string
-		s          memoryStorage
+		s          *memoryStorage
 		URL        string
 		user       string
 		iterations int
@@ -74,7 +75,7 @@ func Test_memoryStorage_AddURL(t *testing.T) {
 	}{
 		{
 			"Успешное добавление 1 элемента",
-			memoryStorage{map[string]string{}, map[string][]string{}},
+			&memoryStorage{map[string]MemoryRecord{}, map[string][]string{}, sync.RWMutex{}, nil, nil},
 			"http://ya.ru",
 			"1111122222",
 			1,
@@ -82,7 +83,7 @@ func Test_memoryStorage_AddURL(t *testing.T) {
 		},
 		{
 			"Успешное добавление дублирующих элементов",
-			memoryStorage{map[string]string{}, map[string][]string{}},
+			&memoryStorage{map[string]MemoryRecord{}, map[string][]string{}, sync.RWMutex{}, nil, nil},
 			"http://ya.ru",
 			"3333344444",
 			3,
@@ -103,35 +104,39 @@ func Test_memoryStorage_AddURL(t *testing.T) {
 func Test_memoryStorage_FindURL(t *testing.T) {
 	tests := []struct {
 		name    string
-		s       memoryStorage
+		s       *memoryStorage
 		URL     string
 		wantURL string
 		OK      bool
 	}{
 		{
 			"Неуспешная попытка поиска в пустом хранилище",
-			memoryStorage{map[string]string{}, map[string][]string{}},
+			&memoryStorage{map[string]MemoryRecord{}, map[string][]string{}, sync.RWMutex{}, nil, nil},
 			"dummy",
 			"",
 			false,
 		},
 		{
 			"Успешная попытка поиска в списке из 1 элемента",
-			memoryStorage{map[string]string{"dummy": "http://ya.ru"}, map[string][]string{}},
+			&memoryStorage{map[string]MemoryRecord{"dummy": {"http://ya.ru", "", false}}, map[string][]string{}, sync.RWMutex{}, nil, nil},
 			"dummy",
 			"http://ya.ru",
 			true,
 		},
 		{
 			"Успешная попытка поиска в списке из 3 элементов",
-			memoryStorage{map[string]string{"dummy": "http://ya.ru", "dummy1": "http://mail.ru", "dummy2": "http://google.ru"}, map[string][]string{}},
+			&memoryStorage{map[string]MemoryRecord{
+				"dummy":  {"http://ya.ru", "", false},
+				"dummy1": {"http://mail.ru", "", false},
+				"dummy2": {"http://google.ru", "", false},
+			}, map[string][]string{}, sync.RWMutex{}, nil, nil},
 			"dummy1",
 			"http://mail.ru",
 			true,
 		},
 		{
 			"Неуспешная попытка поиска в непустом списке",
-			memoryStorage{map[string]string{"dummy": "http://ya.ru"}, map[string][]string{}},
+			&memoryStorage{map[string]MemoryRecord{"dummy": {"http://ya.ru", "", false}}, map[string][]string{}, sync.RWMutex{}, nil, nil},
 			"dummy1",
 			"",
 			false,
@@ -139,9 +144,9 @@ func Test_memoryStorage_FindURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l, err := tt.s.FindURL(tt.URL)
+			result, err := tt.s.FindURL(tt.URL)
 			assert.Equal(t, tt.OK, err == nil)
-			assert.Equal(t, tt.wantURL, l)
+			assert.Equal(t, tt.wantURL, result.LongURL)
 		})
 	}
 }
@@ -156,28 +161,38 @@ func Test_fileStorage_AddURL(t *testing.T) {
 	}{
 		{
 			"Неуспешная попытка поиска в пустом хранилище",
-			fileStorage{&memoryStorage{map[string]string{}, map[string][]string{}}, nil, nil, nil},
+			fileStorage{&memoryStorage{map[string]MemoryRecord{}, map[string][]string{}, sync.RWMutex{}, nil, nil}, nil, nil, nil},
 			"dummy",
 			"",
 			false,
 		},
 		{
 			"Успешная попытка поиска в списке из 1 элемента",
-			fileStorage{&memoryStorage{map[string]string{"dummy": "http://ya.ru"}, map[string][]string{}}, nil, nil, nil},
+			fileStorage{&memoryStorage{map[string]MemoryRecord{"dummy": {"http://ya.ru", "", false}}, map[string][]string{}, sync.RWMutex{}, nil, nil}, nil, nil, nil},
 			"dummy",
 			"http://ya.ru",
 			true,
 		},
 		{
 			"Успешная попытка поиска в списке из 3 элементов",
-			fileStorage{&memoryStorage{map[string]string{"dummy": "http://ya.ru", "dummy1": "http://mail.ru", "dummy2": "http://google.ru"}, map[string][]string{}}, nil, nil, nil},
+			fileStorage{&memoryStorage{map[string]MemoryRecord{
+				"dummy":  {"http://ya.ru", "", false},
+				"dummy1": {"http://mail.ru", "", false},
+				"dummy2": {"http://google.ru", "", false},
+			},
+				map[string][]string{},
+				sync.RWMutex{},
+				nil,
+				nil,
+			},
+				nil, nil, nil},
 			"dummy1",
 			"http://mail.ru",
 			true,
 		},
 		{
 			"Неуспешная попытка поиска в непустом списке",
-			fileStorage{&memoryStorage{map[string]string{"dummy": "http://ya.ru"}, map[string][]string{}}, nil, nil, nil},
+			fileStorage{&memoryStorage{map[string]MemoryRecord{"dummy": {"http://ya.ru", "", false}}, map[string][]string{}, sync.RWMutex{}, nil, nil}, nil, nil, nil},
 			"dummy1",
 			"",
 			false,
@@ -185,9 +200,9 @@ func Test_fileStorage_AddURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l, err := tt.s.FindURL(tt.URL)
+			result, err := tt.s.FindURL(tt.URL)
 			assert.Equal(t, tt.OK, err == nil)
-			assert.Equal(t, tt.wantURL, l)
+			assert.Equal(t, tt.wantURL, result.LongURL)
 		})
 	}
 }

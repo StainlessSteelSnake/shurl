@@ -21,7 +21,7 @@ type authentication struct {
 }
 
 type Authenticator interface {
-	Authenticate(http.HandlerFunc) http.HandlerFunc
+	Authenticate(http.Handler) http.Handler
 	GetUserID() string
 }
 
@@ -81,7 +81,7 @@ func (a *authentication) authExisting(cookie string) error {
 	}
 	log.Println("Cookie расшифрованы в следующие байты:", data)
 
-	if userIDLength*2 < len(cookie) {
+	if len(cookie) < userIDLength*2 {
 		return errors.New("неправильная длина cookie")
 	}
 	id := cookie[:userIDLength*2]
@@ -110,16 +110,17 @@ func (a *authentication) authExisting(cookie string) error {
 	return nil
 }
 
-func (a *authentication) Authenticate(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func (a *authentication) Authenticate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if a == nil {
 			return
 		}
 
+		a.userID = ""
+		a.cookieFull = ""
+
 		cookie, err := r.Cookie(cookieAuthentication)
 		if err != nil {
-			a.cookieFull = ""
-			a.userID = ""
 			log.Println("Cookie '" + cookieAuthentication + "' не переданы")
 		}
 
@@ -128,7 +129,7 @@ func (a *authentication) Authenticate(next http.HandlerFunc) http.HandlerFunc {
 			err = a.authExisting(cookie.Value)
 		}
 		if err != nil {
-			log.Println("Ошибка при чтении cookie:", err)
+			log.Println("Ошибка при аутентификации пользователя через cookie 'authentication':", err)
 		}
 
 		err = nil
@@ -143,8 +144,8 @@ func (a *authentication) Authenticate(next http.HandlerFunc) http.HandlerFunc {
 			http.SetCookie(w, &http.Cookie{Name: cookieAuthentication, Value: a.cookieFull})
 		}
 
-		next(w, r)
-	}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (a *authentication) GetUserID() string {

@@ -1,50 +1,65 @@
 package handlers
 
 import (
+	"context"
 	"errors"
-	"github.com/StainlessSteelSnake/shurl/internal/auth"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/StainlessSteelSnake/shurl/internal/auth"
+	"github.com/StainlessSteelSnake/shurl/internal/storage"
+
 	"github.com/stretchr/testify/assert"
 )
 
-type storage struct {
+type dummyStorage struct {
 	container map[string]string
 	usersURLs map[string][]string
 }
 
-func (s *storage) AddURL(l, user string) (string, error) {
+func (s *dummyStorage) AddURL(l, user string) (string, error) {
 	s.container[l] = l
 	s.usersURLs[user] = append(s.usersURLs[user], l)
 	return l, nil
 }
 
-func (s *storage) FindURL(sh string) (string, error) {
+func (s *dummyStorage) FindURL(sh string) (storage.MemoryRecord, error) {
 	if l, ok := s.container[sh]; ok {
-		return l, nil
+		return storage.MemoryRecord{LongURL: l, User: "", Deleted: false}, nil
 	}
-	return "", errors.New("короткий URL с ID \" + string(sh) + \" не существует")
+	return storage.MemoryRecord{LongURL: "", User: "", Deleted: false}, errors.New("короткий URL с ID \" + string(sh) + \" не существует")
 }
 
-func (s *storage) GetURLsByUser(u string) []string {
+func (s *dummyStorage) GetURLsByUser(u string) []string {
 	return s.usersURLs[u]
 }
 
-func (s *storage) Ping() error {
+func (s *dummyStorage) Ping() error {
 	return nil
 }
 
-func (s *storage) AddURLs(b [][2]string, user string) ([][2]string, error) {
+func (s *dummyStorage) CloseFunc() func() {
+	return nil
+}
+
+func (s *dummyStorage) AddURLs(b storage.BatchURLs, user string) (storage.BatchURLs, error) {
 	for _, record := range b {
-		s.container[record[1]] = record[1]
-		s.usersURLs[user] = append(s.usersURLs[user], record[1])
+		s.container[record.ID] = record.URL
+		s.usersURLs[user] = append(s.usersURLs[user], record.URL)
 
 	}
 	return b, nil
+}
+
+func (s *dummyStorage) DeleteURLs(urls []string, user string) []string {
+	return urls
+}
+
+func (s *dummyStorage) deletionQueueProcess(ctx context.Context) {
+
 }
 
 func TestGzipWriter_Write(t *testing.T) {
@@ -136,7 +151,7 @@ func TestNewHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &storage{tt.storage, tt.user}
+			s := &dummyStorage{tt.storage, tt.user}
 			h := NewHandler(s, tt.baseURL)
 
 			request := httptest.NewRequest(tt.method, tt.request, nil)
@@ -190,7 +205,7 @@ func Test_getLongURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := Handler{storage: &storage{tt.storage, tt.user}}
+			h := Handler{storage: &dummyStorage{tt.storage, tt.user}}
 
 			writer := httptest.NewRecorder()
 			request := httptest.NewRequest(http.MethodGet, tt.request, nil)
@@ -237,7 +252,7 @@ func Test_postLongURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := Handler{storage: &storage{tt.storage, tt.user}, auth: auth.NewAuth()}
+			h := Handler{storage: &dummyStorage{tt.storage, tt.user}, auth: auth.NewAuth()}
 
 			writer := httptest.NewRecorder()
 			requestBody := strings.NewReader(tt.longURL)
@@ -320,7 +335,7 @@ func Test_postLongURLinJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := Handler{storage: &storage{tt.storage, tt.user}, auth: auth.NewAuth()}
+			h := Handler{storage: &dummyStorage{tt.storage, tt.user}, auth: auth.NewAuth()}
 
 			writer := httptest.NewRecorder()
 			requestBody := strings.NewReader(tt.longURL)
