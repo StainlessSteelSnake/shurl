@@ -1,3 +1,5 @@
+// Пакет config отвечает за первичную настройку работы сервиса.
+// В нём задаются настройки подключения к БД, файл для хранения данных, адрес и порт сервера приложения.
 package config
 
 import (
@@ -7,18 +9,22 @@ import (
 	"github.com/caarlos0/env/v6"
 )
 
-const serverAddress = "localhost:8080"
-const baseURL = "http://" + serverAddress + "/"
-const fileStoragePath = "shurldb.txt"
-const databaseDSN = "postgresql://shurl_user:qazxswedc@localhost:5432/shurl"
+const (
+	serverAddress   = "localhost:8080"
+	baseURL         = "http://" + serverAddress + "/"
+	fileStoragePath = "shurldb.txt"
+	databaseDSN     = "postgresql://shurl_user:qazxswedc@localhost:5432/shurl"
+)
 
+// Configuration содержит перечень настроек сервиса.
 type Configuration struct {
-	ServerAddress   string `env:"SERVER_ADDRESS"`
-	BaseURL         string `env:"BASE_URL"`
-	FileStoragePath string `env:"FILE_STORAGE_PATH"`
-	DatabaseDSN     string `env:"DATABASE_DSN"`
+	ServerAddress   string `env:"SERVER_ADDRESS"`    // Адрес сервера приложения
+	BaseURL         string `env:"BASE_URL"`          // Корневой URL работающего сервиса
+	FileStoragePath string `env:"FILE_STORAGE_PATH"` // Путь к файлу для хранения данных сервиса
+	DatabaseDSN     string `env:"DATABASE_DSN"`      // Строка для подключения к базе данных
 }
 
+// NewConfiguration создаёт перечень настроек сервиса.
 func NewConfiguration() *Configuration {
 	cfg := new(Configuration)
 

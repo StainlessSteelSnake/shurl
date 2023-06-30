@@ -1,3 +1,4 @@
+// Пакет auth обеспечивает авторизацию пользователя и получение его идентификатора.
 package auth
 
 import (
@@ -10,38 +11,31 @@ import (
 	"net/http"
 )
 
-const secretKey = "TheKey"
-const userIDLength = 5
-const cookieAuthentication = "authentication"
+const (
+	secretKey            = "TheKey"
+	userIDLength         = 5
+	cookieAuthentication = "authentication"
+)
 
-type authentication struct {
-	userID     string
-	cookieSign []byte
-	cookieFull string
-}
+type (
+	authentication struct {
+		userID     string
+		cookieSign []byte
+		cookieFull string
+	}
 
-type Authenticator interface {
-	Authenticate(http.Handler) http.Handler
-	GetUserID() string
-}
+	// Authenticator позволяет выполнять авторизацию пользователя
+	// и получать идентификатор авторизованного пользователя.
+	Authenticator interface {
+		Authenticate(http.Handler) http.Handler
+		GetUserID() string
+	}
+)
 
+// NewAuth создаёт экземпляр аутентификатора.
 func NewAuth() Authenticator {
 	a := authentication{"", make([]byte, 0), ""}
 	return &a
-}
-
-func getSign(id string) ([]byte, error) {
-	if id == "" {
-		return nil, errors.New("не задан user ID пользователя")
-	}
-
-	h := hmac.New(sha256.New, []byte(secretKey))
-	_, err := h.Write([]byte(id))
-	if err != nil {
-		return nil, err
-	}
-
-	return h.Sum(nil), nil
 }
 
 func (a *authentication) authNew() error {
@@ -110,6 +104,8 @@ func (a *authentication) authExisting(cookie string) error {
 	return nil
 }
 
+// Authenticate обрабатывает http-запрос на авторизацию пользователя.
+// Затем передаёт запрос следующему обработчику в цепочке.
 func (a *authentication) Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if a == nil {
@@ -148,6 +144,21 @@ func (a *authentication) Authenticate(next http.Handler) http.Handler {
 	})
 }
 
+// GetUserID возвращает идентификатор авторизованного пользователя.
 func (a *authentication) GetUserID() string {
 	return a.userID
+}
+
+func getSign(id string) ([]byte, error) {
+	if id == "" {
+		return nil, errors.New("не задан user ID пользователя")
+	}
+
+	h := hmac.New(sha256.New, []byte(secretKey))
+	_, err := h.Write([]byte(id))
+	if err != nil {
+		return nil, err
+	}
+
+	return h.Sum(nil), nil
 }
