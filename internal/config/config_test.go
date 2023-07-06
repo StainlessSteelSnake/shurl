@@ -5,28 +5,17 @@ import (
 	"testing"
 )
 
-func TestConfiguration_fillFromEnvironment(t *testing.T) {
-	type fields struct {
-		ServerAddress   string
-		BaseURL         string
-		FileStoragePath string
-	}
+func TestNewConfiguration(t *testing.T) {
 	tests := []struct {
-		name    string
-		fields  fields
-		wantErr bool
+		name string
+		want *Configuration
 	}{
 		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &Configuration{
-				ServerAddress:   tt.fields.ServerAddress,
-				BaseURL:         tt.fields.BaseURL,
-				FileStoragePath: tt.fields.FileStoragePath,
-			}
-			if err := c.fillFromEnvironment(); (err != nil) != tt.wantErr {
-				t.Errorf("fillFromEnvironment() error = %v, wantErr %v", err, tt.wantErr)
+			if got := NewConfiguration(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NewConfiguration() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -56,17 +45,28 @@ func TestConfiguration_fillFromFlags(t *testing.T) {
 	}
 }
 
-func TestNewConfiguration(t *testing.T) {
+func TestConfiguration_fillFromEnvironment(t *testing.T) {
+	type fields struct {
+		ServerAddress   string
+		BaseURL         string
+		FileStoragePath string
+	}
 	tests := []struct {
-		name string
-		want *Configuration
+		name    string
+		fields  fields
+		wantErr bool
 	}{
 		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewConfiguration(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewConfiguration() = %v, want %v", got, tt.want)
+			c := &Configuration{
+				ServerAddress:   tt.fields.ServerAddress,
+				BaseURL:         tt.fields.BaseURL,
+				FileStoragePath: tt.fields.FileStoragePath,
+			}
+			if err := c.fillFromEnvironment(); (err != nil) != tt.wantErr {
+				t.Errorf("fillFromEnvironment() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
