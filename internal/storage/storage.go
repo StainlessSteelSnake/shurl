@@ -12,6 +12,7 @@ import (
 	"time"
 )
 
+// Константы для обработки очередей на удаление записей.
 const (
 	// DeletionBatchSize задаёт максимальный размер пакета для массового удаления данных.
 	DeletionBatchSize = 20
@@ -19,6 +20,7 @@ const (
 	DeletionQueueSize = DeletionBatchSize * 2
 )
 
+// Типы данных, специфичные для хранилища с использованием БД.
 type (
 	// RecordURL содержит запись для списка массового сокращения длинных URL.
 	RecordURL struct {
