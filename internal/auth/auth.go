@@ -12,22 +12,26 @@ import (
 )
 
 const (
-	secretKey            = "TheKey"
-	userIDLength         = 5
-	cookieAuthentication = "authentication"
+	secretKey            = "TheKey"         // Секретный ключ для подписи cookie
+	userIDLength         = 5                // Длина идентификатора пользователя для генерации случайной последовательности символов
+	cookieAuthentication = "authentication" // Заголовок HTTP-запроса для передачи данных авторизации
 )
 
 type (
+	// authentication хранит данные авторизованного пользователя:
+	// его идентификатор, cookie и подпись для cookie.
 	authentication struct {
-		userID     string
-		cookieSign []byte
-		cookieFull string
+		userID     string // Идентификатор пользователя
+		cookieSign []byte // Подпись для подтверждения подлинности cookie
+		cookieFull string // Переданные в HTTP-запросе или сгенерированные при авторизации cookie пользователя
 	}
 
 	// Authenticator позволяет выполнять авторизацию пользователя
 	// и получать идентификатор авторизованного пользователя.
 	Authenticator interface {
+		// Обработка HTTP-запроса и авторизация пользователя
 		Authenticate(http.Handler) http.Handler
+		// Получение идентификатора авторизованного пользователя
 		GetUserID() string
 	}
 )
