@@ -16,6 +16,7 @@ const (
 	txPreparedDelete = "shurl-delete"
 )
 
+// Типы данных, относящиеся к реализации хранилища в БД.
 type (
 	// DatabaseStorage содержит настройки хранилища в БД, включающие соединение с БД и ссылку на хранилище в памяти.
 	DatabaseStorage struct {

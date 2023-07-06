@@ -17,6 +17,7 @@ const (
 	cookieAuthentication = "authentication" // Заголовок HTTP-запроса для передачи данных авторизации
 )
 
+// Типы данных для хранения данных авторизации пользователя.
 type (
 	// authentication хранит данные авторизованного пользователя: его идентификатор, cookie и подпись для cookie.
 	authentication struct {
