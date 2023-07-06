@@ -42,6 +42,7 @@ func NewAuth() Authenticator {
 	return &a
 }
 
+// authNew создаёт идентификатор для нового пользователя и соответствующие cookie.
 func (a *authentication) authNew() error {
 	log.Println("Создание ID для нового пользователя")
 
@@ -67,6 +68,7 @@ func (a *authentication) authNew() error {
 	return nil
 }
 
+// authExisting проверяет переданные в HTTP-запросе cookie и авторизовывает пользователя на их основании.
 func (a *authentication) authExisting(cookie string) error {
 	if cookie == "" {
 		return errors.New("не переданы cookie для идентификации пользователя")
@@ -153,6 +155,8 @@ func (a *authentication) GetUserID() string {
 	return a.userID
 }
 
+// getSign создаёт подпись для переданного идентификатора пользователя
+// по алгоритму SHA-256 с использованием секретного ключа.
 func getSign(id string) ([]byte, error) {
 	if id == "" {
 		return nil, errors.New("не задан user ID пользователя")
