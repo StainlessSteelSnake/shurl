@@ -4,31 +4,40 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
+
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"log"
 )
 
-const txPreparedInsert = "shurl-insert"
-const txPreparedDelete = "shurl-delete"
+const (
+	txPreparedInsert = "shurl-insert"
+	txPreparedDelete = "shurl-delete"
+)
 
-type databaseStorage struct {
-	*memoryStorage
-	conn *pgx.Conn
+// Типы данных, относящиеся к реализации хранилища в БД.
+type (
+	// DatabaseStorage содержит настройки хранилища в БД, включающие соединение с БД и ссылку на хранилище в памяти.
+	DatabaseStorage struct {
+		*MemoryStorage
+		conn *pgx.Conn
+	}
+
+	// DBError описывает структуру данных об ошибке при взаимодействии с хранилищем в БД.
+	DBError struct {
+		LongURL   string // Исходный длинный URL
+		Duplicate bool   // Признак "найден дубликат"
+		Err       error  // Сообщение об ошибке
+	}
+)
+
+// DeletionQueueProcess обрабатывает очередь запросов на удаление, вызывая обработчик каждой записи в отдельном потоке.
+func (s *DatabaseStorage) DeletionQueueProcess(ctx context.Context) {
+	go deletionQueueProcess(ctx, s, s.MemoryStorage.deletionQueue)
 }
 
-type DBError struct {
-	LongURL   string
-	Duplicate bool
-	Err       error
-}
-
-func (s *databaseStorage) deletionQueueProcess(ctx context.Context) {
-	go deletionQueueProcess(ctx, s, s.memoryStorage.deletionQueue)
-}
-
-func (s *databaseStorage) delete(ctx context.Context, deletionBatch []string) error {
+func (s *DatabaseStorage) delete(ctx context.Context, deletionBatch []string) error {
 	s.locker.Lock()
 	defer s.locker.Unlock()
 
@@ -56,11 +65,12 @@ func (s *databaseStorage) delete(ctx context.Context, deletionBatch []string) er
 		return err
 	}
 
-	return s.memoryStorage.delete(ctx, deletionBatch)
+	return s.MemoryStorage.delete(ctx, deletionBatch)
 }
 
-func newDBStorage(ctx context.Context, m *memoryStorage, database string) *databaseStorage {
-	storage := &databaseStorage{memoryStorage: m, conn: nil}
+// NewDBStorage создаёт реализацию хранилища в БД.
+func NewDBStorage(ctx context.Context, m *MemoryStorage, database string) *DatabaseStorage {
+	storage := &DatabaseStorage{MemoryStorage: m, conn: nil}
 
 	var err error
 	storage.conn, err = pgx.Connect(ctx, database)
@@ -77,7 +87,7 @@ func newDBStorage(ctx context.Context, m *memoryStorage, database string) *datab
 	return storage
 }
 
-func (s *databaseStorage) init(ctx context.Context) error {
+func (s *DatabaseStorage) init(ctx context.Context) error {
 
 	_, err := s.conn.Exec(ctx, queryCreateTable)
 	if err != nil {
@@ -99,8 +109,8 @@ func (s *databaseStorage) init(ctx context.Context) error {
 			log.Println("Ошибка чтения из БД:", err)
 		}
 
-		s.memoryStorage.container[sh] = MemoryRecord{LongURL: l, Deleted: d, User: u}
-		s.memoryStorage.usersURLs[u] = append(s.memoryStorage.usersURLs[u], sh)
+		s.MemoryStorage.container[sh] = MemoryRecord{LongURL: l, Deleted: d, User: u}
+		s.MemoryStorage.usersURLs[u] = append(s.MemoryStorage.usersURLs[u], sh)
 	}
 
 	err = rows.Err()
@@ -112,10 +122,12 @@ func (s *databaseStorage) init(ctx context.Context) error {
 	return nil
 }
 
+// Error выдаёт текст сообщения об ошибке при взаимодействии с хранилищем в БД.
 func (e DBError) Error() string {
 	return fmt.Sprintf("Найден дубликат для полного URL: %v. Ошибка добавления в БД: %v", e.LongURL, e.Err)
 }
 
+// Is сравнивает произвольные данные об ошибке с типом данных об ошибке при взаимодействии с хранилищем в БД.
 func (e DBError) Is(target error) bool {
 	err, ok := target.(DBError)
 	if !ok {
@@ -129,6 +141,7 @@ func (e DBError) Is(target error) bool {
 	return true
 }
 
+// NewStorageDBError создаёт данные об ошибке при взаимодействии с хранилищем в БД.
 func NewStorageDBError(longURL string, duplicate bool, err error) error {
 	return &DBError{
 		LongURL:   longURL,
@@ -137,9 +150,10 @@ func NewStorageDBError(longURL string, duplicate bool, err error) error {
 	}
 }
 
-func (s *databaseStorage) AddURL(l, user string) (string, error) {
+// AddURL добавляет исходный длинный URL в хранилище в БД, связывая его с созданным коротким URL.
+func (s *DatabaseStorage) AddURL(l, user string) (string, error) {
 
-	sh, err := s.memoryStorage.AddURL(l, user)
+	sh, err := s.MemoryStorage.AddURL(l, user)
 	if err != nil {
 		return "", err
 	}
@@ -177,7 +191,8 @@ func (s *databaseStorage) AddURL(l, user string) (string, error) {
 	return sh, nil
 }
 
-func (s *databaseStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, error) {
+// AddURLs добавляет несколько исходных длинных URL в хранилище в БД, связывая их с соответствующими созданными короткими URL.
+func (s *DatabaseStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, error) {
 	result := make(BatchURLs, 0, len(longURLs))
 
 	ctx := context.Background()
@@ -194,7 +209,7 @@ func (s *databaseStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, e
 	}
 
 	for _, longURL := range longURLs {
-		sh, err := s.memoryStorage.AddURL(longURL.URL, user)
+		sh, err := s.MemoryStorage.AddURL(longURL.URL, user)
 		if err != nil {
 			return result[:0], err
 		}
@@ -218,9 +233,10 @@ func (s *databaseStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, e
 	return result, nil
 }
 
-func (s *databaseStorage) CloseFunc() func() {
+// CloseFunc возвращает функцию для закрытия соединения с БД, используемой для хранения информации о коротких и длинных URL.
+func (s *DatabaseStorage) CloseFunc() func() {
 	return func() {
-		s.deletionCancel()
+		s.DeletionCancel()
 		close(s.deletionQueue)
 		//close(s.errors)
 
@@ -237,9 +253,10 @@ func (s *databaseStorage) CloseFunc() func() {
 	}
 }
 
-func (s *databaseStorage) Ping() error {
+// Ping проверяет соединение с БД и выдаёт ошибку, если оно не установлено.
+func (s *DatabaseStorage) Ping() error {
 	if s.conn == nil {
-		return s.memoryStorage.Ping()
+		return s.MemoryStorage.Ping()
 	}
 
 	ctx := context.Background()

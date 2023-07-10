@@ -1,3 +1,4 @@
+// Пакет storage отвечает за хранилище данных и различные способы его организации.
 package storage
 
 import (
@@ -11,45 +12,63 @@ import (
 	"time"
 )
 
-const DeletionBatchSize = 20
-const DeletionQueueSize = DeletionBatchSize * 2
+// Константы для обработки очередей на удаление записей.
+const (
+	// DeletionBatchSize задаёт максимальный размер пакета для массового удаления данных.
+	DeletionBatchSize = 20
+	// DeletionQueueSize задаёт максимальный размер очереди записей, подлежащих удалению.
+	DeletionQueueSize = DeletionBatchSize * 2
+)
 
-type RecordURL struct {
-	ID  string
-	URL string
-}
+// Типы данных для работы хранилища.
+type (
+	// RecordURL содержит запись для списка массового сокращения длинных URL.
+	RecordURL struct {
+		ID  string // Идентификатор записи в исходном запросе
+		URL string // Длинный URL, который подлежит сокращению
+	}
 
-type BatchURLs = []RecordURL
+	// BatchURLs содержит список URL, подлежащих сокращению
+	BatchURLs = []RecordURL
 
-type Storager interface {
-	AddURL(string, string) (string, error)
-	AddURLs(BatchURLs, string) (BatchURLs, error)
-	FindURL(string) (MemoryRecord, error)
-	GetURLsByUser(string) []string
-	DeleteURLs([]string, string) []string
-	CloseFunc() func()
-	Ping() error
-}
+	// Storager обеспечивает экземпляр хранилища основными функциями.
+	Storager interface {
+		AddURL(string, string) (string, error)        // Добавление длинного URL в хранилище и его сокращение.
+		AddURLs(BatchURLs, string) (BatchURLs, error) // Добавление списка длинных URL в хранилище и их сокращение.
+		FindURL(string) (MemoryRecord, error)         // Поиск длинного URL в хранилище по его сокращённому варианту.
+		GetURLsByUser(string) []string                // Поиск в хранилище всех URL, добавленных текущим пользователем.
+		DeleteURLs([]string, string) []string         // Удаление из хранилища списка URL.
+		CloseFunc() func()                            // Закрытие соединения с хранилищем (для файла или БД).
+		Ping() error                                  // Проверка установки соединения с БД.
+	}
 
-type deleter interface {
-	deletionQueueProcess(context.Context)
-	delete(context.Context, []string) error
-}
+	deleter interface {
+		DeletionQueueProcess(context.Context)
+		delete(context.Context, []string) error
+	}
 
-type MemoryRecord struct {
-	LongURL string
-	User    string
-	Deleted bool
-}
+	// MemoryRecord содержит соответствие исходного длинного URL и пользователя, добавившего его.
+	// А также пометку об удаление этого URL из хранилища.
+	MemoryRecord struct {
+		LongURL string
+		User    string
+		Deleted bool
+	}
 
-type memoryStorage struct {
-	container      map[string]MemoryRecord
-	usersURLs      map[string][]string
-	locker         sync.RWMutex
-	deletionQueue  chan string
-	deletionCancel context.CancelFunc
-}
+	// MemoryStorage обеспечивает хранилище в памяти для соответствий исходных длинных URL и соответствующих им коротких URL.
+	// А также хранит информацию об URL, добавленных определёнными пользователми,
+	// обеспечивает блокировку хранилища при конкурентном доступе,
+	// содержит ссылку на очередь для удаления записей и функцию для отмены контекста операций удаления.
+	MemoryStorage struct {
+		container      map[string]MemoryRecord
+		usersURLs      map[string][]string
+		locker         sync.RWMutex
+		deletionQueue  chan string
+		DeletionCancel context.CancelFunc
+	}
+)
 
+// NewStorage создаёт реализацию хранилища в памяти, в файле или в БД, в зависимости от переданных настроек.
 func NewStorage(ctx context.Context, filePath string, database string) Storager {
 	var storage Storager
 
@@ -57,33 +76,34 @@ func NewStorage(ctx context.Context, filePath string, database string) Storager 
 
 	switch {
 	case database != "":
-		dStorage := newDBStorage(ctx, newMemoryStorage(), database)
-		dStorage.deletionCancel = deletionCancel
-		dStorage.deletionQueueProcess(deletionContext)
+		dStorage := NewDBStorage(ctx, NewMemoryStorage(), database)
+		dStorage.DeletionCancel = deletionCancel
+		dStorage.DeletionQueueProcess(deletionContext)
 		storage = dStorage
 
 	case filePath != "":
-		fStorage := newFileStorage(newMemoryStorage(), filePath)
-		fStorage.deletionCancel = deletionCancel
-		fStorage.deletionQueueProcess(deletionContext)
+		fStorage := newFileStorage(NewMemoryStorage(), filePath)
+		fStorage.DeletionCancel = deletionCancel
+		fStorage.DeletionQueueProcess(deletionContext)
 		storage = fStorage
 
 	default:
-		mStorage := newMemoryStorage()
-		mStorage.deletionCancel = deletionCancel
-		mStorage.deletionQueueProcess(deletionContext)
+		mStorage := NewMemoryStorage()
+		mStorage.DeletionCancel = deletionCancel
+		mStorage.DeletionQueueProcess(deletionContext)
 		storage = mStorage
 	}
 
 	return storage
 }
 
-func newMemoryStorage() *memoryStorage {
-	return &memoryStorage{
+// NewMemoryStorage создаёт реализацию хранилища в памяти приложения.
+func NewMemoryStorage() *MemoryStorage {
+	return &MemoryStorage{
 		container:      map[string]MemoryRecord{},
 		usersURLs:      map[string][]string{},
 		deletionQueue:  make(chan string, DeletionQueueSize),
-		deletionCancel: nil,
+		DeletionCancel: nil,
 	}
 }
 
@@ -103,7 +123,8 @@ func generateShortURL() (string, error) {
 	return result, nil
 }
 
-func (s *memoryStorage) AddURL(l, user string) (string, error) {
+// AddURL добавляет исходный длинный URL в хранилище в памяти, связывая его с созданным коротким URL.
+func (s *MemoryStorage) AddURL(l, user string) (string, error) {
 	s.locker.Lock()
 	defer s.locker.Unlock()
 
@@ -121,7 +142,8 @@ func (s *memoryStorage) AddURL(l, user string) (string, error) {
 	return sh, nil
 }
 
-func (s *memoryStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, error) {
+// AddURLs добавляет несколько исходных длинных URL в хранилище в памяти, связывая их с соответствующими созданными короткими URL.
+func (s *MemoryStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, error) {
 	s.locker.Lock()
 	defer s.locker.Unlock()
 
@@ -138,7 +160,8 @@ func (s *memoryStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, err
 	return result, nil
 }
 
-func (s *memoryStorage) FindURL(sh string) (MemoryRecord, error) {
+// FindURL ищет в хранилище в памяти исходный длинный URL по заданному короткому URL.
+func (s *MemoryStorage) FindURL(sh string) (MemoryRecord, error) {
 	s.locker.RLock()
 	defer s.locker.RUnlock()
 
@@ -150,22 +173,26 @@ func (s *memoryStorage) FindURL(sh string) (MemoryRecord, error) {
 	return result, nil
 }
 
-func (s *memoryStorage) GetURLsByUser(u string) []string {
+// GetURLsByUser ищет в хранилище в памяти исходные длинные URL по заданному идентификатору пользователя, добавившего их.
+func (s *MemoryStorage) GetURLsByUser(u string) []string {
 	s.locker.RLock()
 	defer s.locker.RUnlock()
 
 	return s.usersURLs[u]
 }
 
-func (s *memoryStorage) CloseFunc() func() {
+// CloseFunc не возвращает никакую функцию, поскольку соединение с БД не устанавливается для хранилища в памяти.
+func (s *MemoryStorage) CloseFunc() func() {
 	return nil
 }
 
-func (s *memoryStorage) Ping() error {
+// Ping возвращает сообщение об ошибке, поскольку соединение с БД не устанавливается для хранилища в памяти.
+func (s *MemoryStorage) Ping() error {
 	return errors.New("БД не была подключена, используется хранилище в памяти")
 }
 
-func (s *memoryStorage) DeleteURLs(shortURLs []string, user string) (deleted []string) {
+// DeleteURLs добавляет заданные короткие URL в очередь на удаление из хранилища в памяти.
+func (s *MemoryStorage) DeleteURLs(shortURLs []string, user string) (deleted []string) {
 	go func() {
 		s.locker.RLock()
 		defer s.locker.RUnlock()
@@ -187,7 +214,7 @@ func (s *memoryStorage) DeleteURLs(shortURLs []string, user string) (deleted []s
 	return deleted
 }
 
-func (s *memoryStorage) delete(ctx context.Context, deletionBatch []string) error {
+func (s *MemoryStorage) delete(ctx context.Context, deletionBatch []string) error {
 	//s.locker.Lock()
 	//defer s.locker.Unlock()
 
@@ -200,7 +227,8 @@ func (s *memoryStorage) delete(ctx context.Context, deletionBatch []string) erro
 	return nil
 }
 
-func (s *memoryStorage) deletionQueueProcess(ctx context.Context) {
+// DeletionQueueProcess обрабатывает очередь запросов на удаление, вызывая обработчик каждой записи в отдельном потоке.
+func (s *MemoryStorage) DeletionQueueProcess(ctx context.Context) {
 	go deletionQueueProcess(ctx, s, s.deletionQueue)
 }
 

@@ -1,3 +1,4 @@
+// Пакет auth обеспечивает авторизацию пользователя и получение его идентификатора.
 package auth
 
 import (
@@ -10,40 +11,37 @@ import (
 	"net/http"
 )
 
-const secretKey = "TheKey"
-const userIDLength = 5
-const cookieAuthentication = "authentication"
+const (
+	secretKey            = "TheKey"         // Секретный ключ для подписи cookie
+	userIDLength         = 5                // Длина идентификатора пользователя для генерации случайной последовательности символов
+	cookieAuthentication = "authentication" // Заголовок HTTP-запроса для передачи данных авторизации
+)
 
-type authentication struct {
-	userID     string
-	cookieSign []byte
-	cookieFull string
-}
+// Типы данных для хранения данных авторизации пользователя.
+type (
+	// authentication хранит данные авторизованного пользователя: его идентификатор, cookie и подпись для cookie.
+	authentication struct {
+		userID     string // Идентификатор пользователя
+		cookieSign []byte // Подпись для подтверждения подлинности cookie
+		cookieFull string // Переданные в HTTP-запросе или сгенерированные при авторизации cookie пользователя
+	}
 
-type Authenticator interface {
-	Authenticate(http.Handler) http.Handler
-	GetUserID() string
-}
+	// Authenticator позволяет выполнять авторизацию пользователя и получать идентификатор авторизованного пользователя.
+	Authenticator interface {
+		// Обработка HTTP-запроса и авторизация пользователя
+		Authenticate(http.Handler) http.Handler
+		// Получение идентификатора авторизованного пользователя
+		GetUserID() string
+	}
+)
 
+// NewAuth создаёт экземпляр аутентификатора.
 func NewAuth() Authenticator {
 	a := authentication{"", make([]byte, 0), ""}
 	return &a
 }
 
-func getSign(id string) ([]byte, error) {
-	if id == "" {
-		return nil, errors.New("не задан user ID пользователя")
-	}
-
-	h := hmac.New(sha256.New, []byte(secretKey))
-	_, err := h.Write([]byte(id))
-	if err != nil {
-		return nil, err
-	}
-
-	return h.Sum(nil), nil
-}
-
+// authNew создаёт идентификатор для нового пользователя и соответствующие cookie.
 func (a *authentication) authNew() error {
 	log.Println("Создание ID для нового пользователя")
 
@@ -69,6 +67,7 @@ func (a *authentication) authNew() error {
 	return nil
 }
 
+// authExisting проверяет переданные в HTTP-запросе cookie и авторизовывает пользователя на их основании.
 func (a *authentication) authExisting(cookie string) error {
 	if cookie == "" {
 		return errors.New("не переданы cookie для идентификации пользователя")
@@ -110,6 +109,8 @@ func (a *authentication) authExisting(cookie string) error {
 	return nil
 }
 
+// Authenticate обрабатывает http-запрос на авторизацию пользователя.
+// Затем передаёт запрос следующему обработчику в цепочке.
 func (a *authentication) Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if a == nil {
@@ -148,6 +149,23 @@ func (a *authentication) Authenticate(next http.Handler) http.Handler {
 	})
 }
 
+// GetUserID возвращает идентификатор авторизованного пользователя.
 func (a *authentication) GetUserID() string {
 	return a.userID
+}
+
+// getSign создаёт подпись для переданного идентификатора пользователя
+// по алгоритму SHA-256 с использованием секретного ключа.
+func getSign(id string) ([]byte, error) {
+	if id == "" {
+		return nil, errors.New("не задан user ID пользователя")
+	}
+
+	h := hmac.New(sha256.New, []byte(secretKey))
+	_, err := h.Write([]byte(id))
+	if err != nil {
+		return nil, err
+	}
+
+	return h.Sum(nil), nil
 }

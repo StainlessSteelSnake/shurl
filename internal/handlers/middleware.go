@@ -13,6 +13,7 @@ type gzipWriter struct {
 	Writer io.Writer
 }
 
+// Write записывает переданный срез байт во внутреннюю переменную.
 func (w gzipWriter) Write(b []byte) (int, error) {
 	return w.Writer.Write(b)
 }

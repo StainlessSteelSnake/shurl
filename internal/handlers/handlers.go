@@ -1,3 +1,4 @@
+// Пакет handlers содержит обработчики http-запросов к сервису.
 package handlers
 
 import (
@@ -7,52 +8,68 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/StainlessSteelSnake/shurl/internal/storage"
+	"github.com/go-chi/chi/v5"
 
 	"github.com/StainlessSteelSnake/shurl/internal/auth"
-
-	"github.com/go-chi/chi/v5"
+	"github.com/StainlessSteelSnake/shurl/internal/storage"
 )
 
-type Handler struct {
-	*chi.Mux
-	storage storage.Storager
-	auth    auth.Authenticator
-}
+// Типы данных для обработчиков http-запросов.
+type (
+	// Handler содержит общие настройки и данные для обработки запросов: ссылку на маршрутизатор,
+	// ссылку на хранилище данных и ссылку на обработчик авторизации пользователя.
+	Handler struct {
+		*chi.Mux
+		storage storage.Storager
+		auth    auth.Authenticator
+	}
 
-type PostRequestBody struct {
-	URL string `json:"url"`
-}
+	// PostRequestBody содержит поля для обработки тела входящего POST-запроса в формате JSON.
+	PostRequestBody struct {
+		URL string `json:"url"`
+	}
 
-type PostResponseBody struct {
-	Result string `json:"result"`
-}
+	// PostResponseBody содержит поля для формирования тела ответа в формате JSON на POST-запрос.
+	PostResponseBody struct {
+		Result string `json:"result"`
+	}
 
-type PostRequestRecord struct {
-	ID  string `json:"correlation_id"`
-	URL string `json:"original_url"`
-}
+	// PostRequestRecord содержит поля для обработки записи входящего
+	// POST-запроса в формате JSON на массовую загрузку данных.
+	PostRequestRecord struct {
+		ID  string `json:"correlation_id"`
+		URL string `json:"original_url"`
+	}
 
-type PostResponseRecord struct {
-	ID       string `json:"correlation_id"`
-	ShortURL string `json:"short_url"`
-}
+	// PostResponseRecord содержит поля для обработки записи возвращаемого тела ответа
+	// на POST-запрос в формате JSON на массовую загрузку данных.
+	PostResponseRecord struct {
+		ID       string `json:"correlation_id"`
+		ShortURL string `json:"short_url"`
+	}
 
-type DeleteRequestBody []string
+	// DeleteRequestBody содержит список записей из тела запроса на удаление данных.
+	DeleteRequestBody []string
 
-type PostRequestBatch []PostRequestRecord
+	// PostRequestBatch содержит список записей из тела запроса на массовую загрузку данных.
+	PostRequestBatch []PostRequestRecord
 
-type PostResponseBatch []PostResponseRecord
+	// PostRequestBatch содержит список записей из тела ответа на запрос массовой загрузки данных.
+	PostResponseBatch []PostResponseRecord
+
+	shortAndLongURL struct {
+		ShortURL string `json:"short_url"`
+		LongURL  string `json:"original_url"`
+	}
+
+	shortAndLongURLs []shortAndLongURL
+)
 
 var baseURL string
 
-type shortAndLongURL struct {
-	ShortURL string `json:"short_url"`
-	LongURL  string `json:"original_url"`
-}
-
-type shortAndLongURLs []shortAndLongURL
-
+// NewHandler создаёт верхнеуровневый обработчик HTTP-запросов.
+// А также связывает его с хранилищем данных и обработчиком данных авторизации,
+// выстраивает цепочки обработки для разных типов запросов и запрашиваемых путей.
 func NewHandler(s storage.Storager, bURL string) *Handler {
 	baseURL = bURL
 	log.Println("Base URL:", baseURL)
@@ -76,6 +93,8 @@ func NewHandler(s storage.Storager, bURL string) *Handler {
 		r.Delete("/api/user/urls", handler.deleteURLs)
 		r.MethodNotAllowed(handler.badRequest)
 	})
+
+	handler.Mux.Handle("/debug/pprof/*", http.DefaultServeMux)
 
 	return handler
 }

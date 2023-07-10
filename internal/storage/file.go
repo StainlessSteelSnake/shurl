@@ -7,20 +7,21 @@ import (
 )
 
 type fileStorage struct {
-	*memoryStorage
+	*MemoryStorage
 	file    *os.File
 	decoder *json.Decoder
 	encoder *json.Encoder
 }
 
+// Record описывает структуру отдельной записи хранилища в файле.
 type Record struct {
-	ShortURL string `json:"short_url"`
-	LongURL  string `json:"long_url"`
-	Deleted  bool   `json:"deleted,omitempty"`
-	UserID   string `json:"user_id"`
+	ShortURL string `json:"short_url"`         // Короткий URL
+	LongURL  string `json:"long_url"`          // Исходный длинный URL
+	Deleted  bool   `json:"deleted,omitempty"` // Признак удаления записи
+	UserID   string `json:"user_id"`           // Идентификатор пользователя, добавившего исходный длинный URL
 }
 
-func newFileStorage(m *memoryStorage, filePath string) *fileStorage {
+func newFileStorage(m *MemoryStorage, filePath string) *fileStorage {
 	storage := &fileStorage{m, nil, nil, nil}
 
 	if filePath == "" {
@@ -93,8 +94,9 @@ func (s *fileStorage) saveToFile(r *Record) error {
 	return nil
 }
 
+// AddURL добавляет исходный длинный URL в хранилище в файле, связывая его с созданным коротким URL.
 func (s *fileStorage) AddURL(l, user string) (string, error) {
-	sh, err := s.memoryStorage.AddURL(l, user)
+	sh, err := s.MemoryStorage.AddURL(l, user)
 	if err != nil {
 		return "", err
 	}
@@ -107,6 +109,7 @@ func (s *fileStorage) AddURL(l, user string) (string, error) {
 	return sh, nil
 }
 
+// AddURLs добавляет несколько исходных длинных URL в хранилище в файле, связывая их с соответствующими созданными короткими URL.
 func (s *fileStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, error) {
 	result := make(BatchURLs, 0, len(longURLs))
 	for _, longURL := range longURLs {
@@ -126,8 +129,9 @@ func (s *fileStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, error
 	return result, nil
 }
 
+// DeleteURLs добавляет заданные короткие URL в очередь на удаление из хранилища в файле.
 func (s *fileStorage) DeleteURLs(shortURLs []string, user string) (deleted []string) {
-	deleted = s.memoryStorage.DeleteURLs(shortURLs, user)
+	deleted = s.MemoryStorage.DeleteURLs(shortURLs, user)
 
 	for _, sh := range deleted {
 		err := s.saveToFile(&Record{ShortURL: sh, LongURL: s.container[sh].LongURL, Deleted: true, UserID: user})
@@ -139,6 +143,7 @@ func (s *fileStorage) DeleteURLs(shortURLs []string, user string) (deleted []str
 	return deleted
 }
 
+// CloseFunc возвращает функцию для закрытия файла, используемого для хранения информации о коротких и длинных URL.
 func (s *fileStorage) CloseFunc() func() {
 	return func() {
 		if s.file == nil {
