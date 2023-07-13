@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -56,10 +55,6 @@ func (s *dummyStorage) AddURLs(b storage.BatchURLs, user string) (storage.BatchU
 
 func (s *dummyStorage) DeleteURLs(urls []string, user string) []string {
 	return urls
-}
-
-func (s *dummyStorage) deletionQueueProcess(ctx context.Context) {
-
 }
 
 func TestGzipWriter_Write(t *testing.T) {
