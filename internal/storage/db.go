@@ -209,14 +209,14 @@ func (s *DatabaseStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, e
 	}
 
 	for _, longURL := range longURLs {
-		sh, err := s.MemoryStorage.AddURL(longURL.URL, user)
-		if err != nil {
-			return result[:0], err
+		sh, err2 := s.MemoryStorage.AddURL(longURL.URL, user)
+		if err2 != nil {
+			return result[:0], err2
 		}
 
-		_, err = tx.Exec(ctx, txPreparedInsert, sh, longURL.URL, user)
-		if err != nil {
-			return result[:0], err
+		_, err2 = tx.Exec(ctx, txPreparedInsert, sh, longURL.URL, user)
+		if err2 != nil {
+			return result[:0], err2
 		}
 
 		result = append(result, RecordURL{ID: longURL.ID, URL: sh})

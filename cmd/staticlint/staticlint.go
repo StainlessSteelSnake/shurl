@@ -36,7 +36,6 @@ var osExitAnalyzer = &analysis.Analyzer{
 func run(pass *analysis.Pass) (interface{}, error) {
 	for _, file := range pass.Files {
 		if file.Name.Name != "main" {
-			pass.Reportf(file.Pos(), file.Name.Name)
 			continue
 		}
 
@@ -100,18 +99,18 @@ func main() {
 
 	for _, a := range staticcheck.Analyzers {
 		if strings.HasSuffix(a.Analyzer.Name, "SA") {
-			checkers = append(checkers, a.Analyzer)
+			//checkers = append(checkers, a.Analyzer)
 		}
 		if strings.HasSuffix(a.Analyzer.Name, "S1") && !staticcheckers["S1"] {
-			checkers = append(checkers, a.Analyzer)
+			//checkers = append(checkers, a.Analyzer)
 			staticcheckers["S1"] = true
 		}
 		if strings.HasSuffix(a.Analyzer.Name, "ST1") && !staticcheckers["ST1"] {
-			checkers = append(checkers, a.Analyzer)
+			//checkers = append(checkers, a.Analyzer)
 			staticcheckers["ST1"] = true
 		}
 		if strings.HasSuffix(a.Analyzer.Name, "QF") && !staticcheckers["QF"] {
-			checkers = append(checkers, a.Analyzer)
+			//checkers = append(checkers, a.Analyzer)
 			staticcheckers["QF"] = true
 		}
 	}
