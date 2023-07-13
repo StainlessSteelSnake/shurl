@@ -54,7 +54,7 @@ type (
 	// PostRequestBatch содержит список записей из тела запроса на массовую загрузку данных.
 	PostRequestBatch []PostRequestRecord
 
-	// PostRequestBatch содержит список записей из тела ответа на запрос массовой загрузки данных.
+	// PostResponseBatch содержит список записей из тела ответа на запрос массовой загрузки данных.
 	PostResponseBatch []PostResponseRecord
 
 	shortAndLongURL struct {
