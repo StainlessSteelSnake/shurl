@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	_ "net/http/pprof"
+	"os"
 
 	"github.com/StainlessSteelSnake/shurl/internal/config"
 	"github.com/StainlessSteelSnake/shurl/internal/handlers"
@@ -11,7 +12,27 @@ import (
 	"github.com/StainlessSteelSnake/shurl/internal/storage"
 )
 
+var (
+	buildVersion, buildDate, buildCommit string
+)
+
 func main() {
+	if buildVersion == "" {
+		buildVersion = "N/A"
+	}
+
+	if buildDate == "" {
+		buildDate = "N/A"
+	}
+
+	if buildCommit == "" {
+		buildCommit = "N/A"
+	}
+
+	os.Stdout.WriteString("Build version: " + buildVersion + "\n")
+	os.Stdout.WriteString("Build date: " + buildDate + "\n")
+	os.Stdout.WriteString("Build commit: " + buildCommit + "\n")
+
 	cfg := config.NewConfiguration()
 	ctx := context.Background()
 
