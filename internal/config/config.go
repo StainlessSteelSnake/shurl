@@ -22,6 +22,7 @@ type Configuration struct {
 	BaseURL         string `env:"BASE_URL"`          // Корневой URL работающего сервиса
 	FileStoragePath string `env:"FILE_STORAGE_PATH"` // Путь к файлу для хранения данных сервиса
 	DatabaseDSN     string `env:"DATABASE_DSN"`      // Строка для подключения к базе данных
+	EnableHTTPS     bool   `env:"ENABLE_HTTPS"`
 }
 
 // NewConfiguration создаёт перечень настроек сервиса.
@@ -58,6 +59,7 @@ func (c *Configuration) fillFromFlags() {
 	flag.StringVar(&c.BaseURL, "b", baseURL, "string with base URL")
 	flag.StringVar(&c.FileStoragePath, "f", fileStoragePath, "string with file storage path")
 	flag.StringVar(&c.DatabaseDSN, "d", "", "string with database data source name")
+	flag.BoolVar(&c.EnableHTTPS, "s", false, "flag to use HTTPS protocol instead of HTTP")
 
 	flag.Parse()
 

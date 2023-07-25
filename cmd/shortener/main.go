@@ -10,6 +10,7 @@ import (
 	"github.com/StainlessSteelSnake/shurl/internal/handlers"
 	"github.com/StainlessSteelSnake/shurl/internal/server"
 	"github.com/StainlessSteelSnake/shurl/internal/storage"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 var (
@@ -61,6 +62,19 @@ func main() {
 	}
 	h := handlers.NewHandler(str, cfg.BaseURL)
 	*/
+
 	srv := server.NewServer(cfg.ServerAddress, h)
-	log.Fatal(srv.ListenAndServe())
+
+	if cfg.EnableHTTPS {
+		manager := &autocert.Manager{
+			Cache:      autocert.DirCache("cache-dir"),
+			Prompt:     autocert.AcceptTOS,
+			HostPolicy: autocert.HostWhitelist("localhost", cfg.ServerAddress),
+		}
+
+		srv.TLSConfig = manager.TLSConfig()
+		log.Fatal(srv.ListenAndServeTLS("", ""))
+	} else {
+		log.Fatal(srv.ListenAndServe())
+	}
 }
