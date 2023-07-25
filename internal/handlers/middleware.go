@@ -32,7 +32,11 @@ func gzipHandler(next http.Handler) http.Handler {
 			http.Error(w, "ошибка при формировании ответа в gzip: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		defer gz.Close()
+		defer func() {
+			if err := gz.Close(); err != nil {
+				log.Println(err)
+			}
+		}()
 
 		w.Header().Set("Content-Encoding", "gzip")
 		next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: gz}, r)
@@ -49,7 +53,11 @@ func decodeRequest(r *http.Request) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer reader.Close()
+	defer func() {
+		if err := reader.Close(); err != nil {
+			log.Println(err)
+		}
+	}()
 
 	return io.ReadAll(reader)
 }

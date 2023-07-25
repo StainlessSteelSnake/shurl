@@ -46,7 +46,11 @@ func (s *DatabaseStorage) delete(ctx context.Context, deletionBatch []string) er
 		return err
 	}
 
-	defer tx.Rollback(ctx)
+	defer func() {
+		if err1 := tx.Rollback(ctx); err1 != nil {
+			log.Println(err1)
+		}
+	}()
 
 	_, err = tx.Prepare(ctx, txPreparedDelete, queryDelete)
 	if err != nil {
@@ -201,7 +205,11 @@ func (s *DatabaseStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, e
 		return result[:0], err
 	}
 
-	defer tx.Rollback(ctx)
+	defer func() {
+		if err1 := tx.Rollback(ctx); err1 != nil {
+			log.Println(err1)
+		}
+	}()
 
 	_, err = tx.Prepare(ctx, txPreparedInsert, queryInsert)
 	if err != nil {
@@ -209,14 +217,14 @@ func (s *DatabaseStorage) AddURLs(longURLs BatchURLs, user string) (BatchURLs, e
 	}
 
 	for _, longURL := range longURLs {
-		sh, err := s.MemoryStorage.AddURL(longURL.URL, user)
-		if err != nil {
-			return result[:0], err
+		sh, err2 := s.MemoryStorage.AddURL(longURL.URL, user)
+		if err2 != nil {
+			return result[:0], err2
 		}
 
-		_, err = tx.Exec(ctx, txPreparedInsert, sh, longURL.URL, user)
-		if err != nil {
-			return result[:0], err
+		_, err2 = tx.Exec(ctx, txPreparedInsert, sh, longURL.URL, user)
+		if err2 != nil {
+			return result[:0], err2
 		}
 
 		result = append(result, RecordURL{ID: longURL.ID, URL: sh})
