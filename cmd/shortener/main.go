@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
@@ -32,9 +33,18 @@ func main() {
 		buildCommit = "N/A"
 	}
 
-	os.Stdout.WriteString("Build version: " + buildVersion + "\n")
-	os.Stdout.WriteString("Build date: " + buildDate + "\n")
-	os.Stdout.WriteString("Build commit: " + buildCommit + "\n")
+	_, err := os.Stdout.WriteString("Build version: " + buildVersion + "\n")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	_, err = os.Stdout.WriteString("Build date: " + buildDate + "\n")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	_, err = os.Stdout.WriteString("Build commit: " + buildCommit + "\n")
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	cfg := config.NewConfiguration()
 	ctx := context.Background()
@@ -78,7 +88,7 @@ func main() {
 
 		err := srv.Shutdown(ctx)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal("HTTP(S) server shutdown error: %v", err)
 		}
 
 		deletionCancel()
@@ -94,9 +104,16 @@ func main() {
 		}
 
 		srv.TLSConfig = manager.TLSConfig()
-		log.Fatal(srv.ListenAndServeTLS("", ""))
+
+		err = srv.ListenAndServeTLS("", "")
+		if err != nil && err != http.ErrServerClosed {
+			log.Fatalf("HTTPS server ListenAndServeTLS: %v", err)
+		}
 	} else {
-		log.Fatal(srv.ListenAndServe())
+		err = srv.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
+			log.Fatalf("HTTP server ListenAndServe: %v", err)
+		}
 	}
 
 	<-canTerminate
