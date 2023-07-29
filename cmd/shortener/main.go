@@ -5,6 +5,8 @@ import (
 	"log"
 	_ "net/http/pprof"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/StainlessSteelSnake/shurl/internal/config"
 	"github.com/StainlessSteelSnake/shurl/internal/handlers"
@@ -65,6 +67,25 @@ func main() {
 
 	srv := server.NewServer(cfg.ServerAddress, h)
 
+	var canTerminate = make(chan struct{})
+	var signalChannel = make(chan os.Signal, 1)
+	signal.Notify(signalChannel, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+
+	go func() {
+		s := <-signalChannel
+
+		log.Println("Signal was received:", s)
+
+		err := srv.Shutdown(ctx)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		deletionCancel()
+
+		close(canTerminate)
+	}()
+
 	if cfg.EnableHTTPS {
 		manager := &autocert.Manager{
 			Cache:      autocert.DirCache("cache-dir"),
@@ -77,4 +98,7 @@ func main() {
 	} else {
 		log.Fatal(srv.ListenAndServe())
 	}
+
+	<-canTerminate
+	log.Println("Terminating the server.")
 }
