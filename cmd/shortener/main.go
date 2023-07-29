@@ -88,7 +88,7 @@ func main() {
 
 		err := srv.Shutdown(ctx)
 		if err != nil {
-			log.Fatal("HTTP(S) server shutdown error: %v", err)
+			log.Fatalln("HTTP(S) server shutdown error:", err)
 		}
 
 		deletionCancel()
@@ -107,12 +107,12 @@ func main() {
 
 		err = srv.ListenAndServeTLS("", "")
 		if err != nil && err != http.ErrServerClosed {
-			log.Fatalf("HTTPS server ListenAndServeTLS: %v", err)
+			log.Fatalln("HTTPS server ListenAndServeTLS:", err)
 		}
 	} else {
 		err = srv.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
-			log.Fatalf("HTTP server ListenAndServe: %v", err)
+			log.Fatalln("HTTP server ListenAndServe:", err)
 		}
 	}
 
