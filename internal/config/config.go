@@ -3,25 +3,29 @@
 package config
 
 import (
+	"encoding/json"
 	"flag"
 	"log"
+	"os"
 
 	"github.com/caarlos0/env/v6"
 )
 
 const (
-	serverAddress   = "localhost:8080"
-	baseURL         = "http://" + serverAddress + "/"
-	fileStoragePath = "shurldb.txt"
-	databaseDSN     = "postgresql://shurl_user:qazxswedc@localhost:5432/shurl"
+	defaultServerAddress   = "localhost:8080"
+	defaultBaseURL         = "http://" + defaultServerAddress + "/"
+	defaultFileStoragePath = "shurldb.txt"
+	defaultDatabaseDSN     = "postgresql://shurl_user:qazxswedc@localhost:5432/shurl"
 )
 
 // Configuration содержит перечень настроек сервиса.
 type Configuration struct {
-	ServerAddress   string `env:"SERVER_ADDRESS"`    // Адрес сервера приложения
-	BaseURL         string `env:"BASE_URL"`          // Корневой URL работающего сервиса
-	FileStoragePath string `env:"FILE_STORAGE_PATH"` // Путь к файлу для хранения данных сервиса
-	DatabaseDSN     string `env:"DATABASE_DSN"`      // Строка для подключения к базе данных
+	ServerAddress   string `env:"SERVER_ADDRESS" json:"server_address"`       // Адрес сервера приложения
+	BaseURL         string `env:"BASE_URL" json:"base_url"`                   // Корневой URL работающего сервиса
+	FileStoragePath string `env:"FILE_STORAGE_PATH" json:"file_storage_path"` // Путь к файлу для хранения данных сервиса
+	DatabaseDSN     string `env:"DATABASE_DSN" json:"database_dsn"`           // Строка для подключения к базе данных
+	EnableHTTPS     bool   `env:"ENABLE_HTTPS" json:"enable_https"`           // Признак "включить поддержку HTTPS"
+	ConfigFilePath  string `env:"CONFIG" json:"-"`                            // Путь к файлу с настройками сервиса
 }
 
 // NewConfiguration создаёт перечень настроек сервиса.
@@ -35,12 +39,19 @@ func NewConfiguration() *Configuration {
 		log.Println(err)
 	}
 
+	if cfg.ConfigFilePath != "" {
+		err = cfg.fillFromFile()
+		if err != nil {
+			log.Println(err)
+		}
+	}
+
 	if cfg.ServerAddress == "" {
-		cfg.ServerAddress = serverAddress
+		cfg.ServerAddress = defaultServerAddress
 	}
 
 	if cfg.BaseURL == "" {
-		cfg.BaseURL = baseURL
+		cfg.BaseURL = defaultBaseURL
 	}
 
 	baseURL := []rune(cfg.BaseURL)
@@ -54,10 +65,13 @@ func NewConfiguration() *Configuration {
 }
 
 func (c *Configuration) fillFromFlags() {
-	flag.StringVar(&c.ServerAddress, "a", serverAddress, "string with server address")
-	flag.StringVar(&c.BaseURL, "b", baseURL, "string with base URL")
-	flag.StringVar(&c.FileStoragePath, "f", fileStoragePath, "string with file storage path")
+	flag.StringVar(&c.ServerAddress, "a", "", "string with server address")
+	flag.StringVar(&c.BaseURL, "b", "", "string with base URL")
+	flag.StringVar(&c.FileStoragePath, "f", "", "string with file storage path")
 	flag.StringVar(&c.DatabaseDSN, "d", "", "string with database data source name")
+	flag.BoolVar(&c.EnableHTTPS, "s", false, "flag to use HTTPS protocol instead of HTTP")
+	flag.StringVar(&c.ConfigFilePath, "c", "", "path to configuration file")
+	flag.StringVar(&c.ConfigFilePath, "config", "", "path to configuration file")
 
 	flag.Parse()
 
@@ -71,6 +85,47 @@ func (c *Configuration) fillFromEnvironment() error {
 	}
 
 	log.Println("Environment config:", c)
+
+	return nil
+}
+
+func (c *Configuration) fillFromFile() error {
+	log.Println("Start reading the file", c.ConfigFilePath)
+
+	content, err := os.ReadFile(c.ConfigFilePath)
+	if err != nil {
+		return err
+	}
+
+	log.Println(string(content))
+
+	var tmpConfig Configuration
+	err = json.Unmarshal(content, &tmpConfig)
+	if err != nil {
+		return err
+	}
+
+	log.Println("Configuration from file '", c.ConfigFilePath, "':\n", tmpConfig)
+
+	if tmpConfig.ServerAddress != "" && c.ServerAddress == "" {
+		c.ServerAddress = tmpConfig.ServerAddress
+	}
+
+	if tmpConfig.BaseURL != "" && c.BaseURL == "" {
+		c.BaseURL = tmpConfig.BaseURL
+	}
+
+	if tmpConfig.FileStoragePath != "" && c.FileStoragePath == "" {
+		c.FileStoragePath = tmpConfig.FileStoragePath
+	}
+
+	if tmpConfig.DatabaseDSN != "" && c.DatabaseDSN == "" {
+		c.DatabaseDSN = tmpConfig.DatabaseDSN
+	}
+
+	if tmpConfig.EnableHTTPS && !c.EnableHTTPS {
+		c.EnableHTTPS = true
+	}
 
 	return nil
 }

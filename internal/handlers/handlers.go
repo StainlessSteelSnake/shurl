@@ -188,9 +188,7 @@ func (h *Handler) postLongURL(w http.ResponseWriter, r *http.Request) {
 		log.Println("Найденный короткий идентификатор URL:", shortURL)
 		w.WriteHeader(http.StatusConflict)
 		err = nil
-	}
-
-	if err != nil {
+	} else if err != nil {
 		log.Println("Ошибка '", err, "' при добавлении в БД URL:", longURL)
 		w.WriteHeader(http.StatusInternalServerError)
 	} else {
