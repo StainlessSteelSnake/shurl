@@ -182,6 +182,7 @@ func (s *MemoryStorage) GetURLsByUser(u string) []string {
 	return s.usersURLs[u]
 }
 
+// GetStatistics возвращает статистику сервиса: количество сокращённых URL и количество пользователей.
 func (s *MemoryStorage) GetStatistics() (urls int, users int) {
 	urls = len(s.container)
 	users = len(s.usersURLs)
