@@ -36,6 +36,10 @@ func (s *dummyStorage) GetURLsByUser(u string) []string {
 	return s.usersURLs[u]
 }
 
+func (s *dummyStorage) GetStatistics() (int, int) {
+	return 1, 1
+}
+
 func (s *dummyStorage) Ping() error {
 	return nil
 }
