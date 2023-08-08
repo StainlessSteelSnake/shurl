@@ -152,7 +152,7 @@ func BenchmarkNewHandler(b *testing.B) {
 		for _, tt := range tests {
 			b.Run(tt.name, func(b *testing.B) {
 				s := &dummyStorage{tt.storage, tt.user}
-				h := NewHandler(s, tt.baseURL)
+				h := NewHandler(s, tt.baseURL, "")
 
 				request := httptest.NewRequest(tt.method, tt.request, nil)
 				writer := httptest.NewRecorder()
@@ -214,7 +214,7 @@ func TestNewHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &dummyStorage{tt.storage, tt.user}
-			h := NewHandler(s, tt.baseURL)
+			h := NewHandler(s, tt.baseURL, "")
 
 			request := httptest.NewRequest(tt.method, tt.request, nil)
 			writer := httptest.NewRecorder()
