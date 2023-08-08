@@ -26,6 +26,7 @@ type Configuration struct {
 	DatabaseDSN     string `env:"DATABASE_DSN" json:"database_dsn"`           // Строка для подключения к базе данных
 	EnableHTTPS     bool   `env:"ENABLE_HTTPS" json:"enable_https"`           // Признак "включить поддержку HTTPS"
 	ConfigFilePath  string `env:"CONFIG" json:"-"`                            // Путь к файлу с настройками сервиса
+	TrustedSubnet   string `env:"TRUSTED_SUBNET" json:"trusted_subnet"`       // IP-подсеть, из которой разрешены запросы статистики сервиса
 }
 
 // NewConfiguration создаёт перечень настроек сервиса.
@@ -72,6 +73,7 @@ func (c *Configuration) fillFromFlags() {
 	flag.BoolVar(&c.EnableHTTPS, "s", false, "flag to use HTTPS protocol instead of HTTP")
 	flag.StringVar(&c.ConfigFilePath, "c", "", "path to configuration file")
 	flag.StringVar(&c.ConfigFilePath, "config", "", "path to configuration file")
+	flag.StringVar(&c.TrustedSubnet, "t", "", "trusted subnet that is allowed to check service statistics")
 
 	flag.Parse()
 
@@ -125,6 +127,10 @@ func (c *Configuration) fillFromFile() error {
 
 	if tmpConfig.EnableHTTPS && !c.EnableHTTPS {
 		c.EnableHTTPS = true
+	}
+
+	if tmpConfig.TrustedSubnet != "" && c.TrustedSubnet == "" {
+		c.TrustedSubnet = tmpConfig.TrustedSubnet
 	}
 
 	return nil

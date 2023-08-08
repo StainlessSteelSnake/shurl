@@ -58,14 +58,14 @@ func main() {
 		dStorage.DeletionQueueProcess(deletionContext)
 		defer dStorage.CloseFunc()
 
-		h = handlers.NewHandler(dStorage, cfg.BaseURL)
+		h = handlers.NewHandler(dStorage, cfg.BaseURL, cfg.TrustedSubnet)
 	} else {
 		dStorage := storage.NewMemoryStorage()
 		dStorage.DeletionCancel = deletionCancel
 		dStorage.DeletionQueueProcess(deletionContext)
 		defer dStorage.CloseFunc()
 
-		h = handlers.NewHandler(dStorage, cfg.BaseURL)
+		h = handlers.NewHandler(dStorage, cfg.BaseURL, cfg.TrustedSubnet)
 	}
 
 	/*str := storage.NewStorage(ctx, cfg.FileStoragePath, cfg.DatabaseDSN)

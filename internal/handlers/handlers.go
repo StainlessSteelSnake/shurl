@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 
@@ -20,8 +21,9 @@ type (
 	// ссылку на хранилище данных и ссылку на обработчик авторизации пользователя.
 	Handler struct {
 		*chi.Mux
-		storage storage.Storager
-		auth    auth.Authenticator
+		storage         storage.Storager
+		auth            auth.Authenticator
+		trustedIpSubnet *net.IPNet
 	}
 
 	// PostRequestBody содержит поля для обработки тела входящего POST-запроса в формате JSON.
@@ -63,6 +65,11 @@ type (
 	}
 
 	shortAndLongURLs []shortAndLongURL
+
+	serviceStatistics struct {
+		URLs  int `json:"urls"`
+		Users int `json:"users"`
+	}
 )
 
 var baseURL string
@@ -70,7 +77,7 @@ var baseURL string
 // NewHandler создаёт верхнеуровневый обработчик HTTP-запросов.
 // А также связывает его с хранилищем данных и обработчиком данных авторизации,
 // выстраивает цепочки обработки для разных типов запросов и запрашиваемых путей.
-func NewHandler(s storage.Storager, bURL string) *Handler {
+func NewHandler(s storage.Storager, bURL string, trustedSubnet string) *Handler {
 	baseURL = bURL
 	log.Println("Base URL:", baseURL)
 
@@ -78,6 +85,14 @@ func NewHandler(s storage.Storager, bURL string) *Handler {
 		chi.NewMux(),
 		s,
 		auth.NewAuth(),
+		nil,
+	}
+
+	_, ipNet, err := net.ParseCIDR(trustedSubnet)
+	if err != nil || ipNet == nil {
+		log.Println("Error while parsing IP-subnet:", err)
+	} else {
+		handler.trustedIpSubnet = ipNet
 	}
 
 	handler.Route("/", func(r chi.Router) {
@@ -91,6 +106,7 @@ func NewHandler(s storage.Storager, bURL string) *Handler {
 		r.Post("/api/shorten", handler.postLongURLinJSON)
 		r.Post("/api/shorten/batch", handler.postLongURLinJSONbatch)
 		r.Delete("/api/user/urls", handler.deleteURLs)
+		r.Get("/api/internal/stats", handler.getStatistics)
 		r.MethodNotAllowed(handler.badRequest)
 	})
 
@@ -359,4 +375,40 @@ func (h *Handler) deleteURLs(w http.ResponseWriter, r *http.Request) {
 	_ = h.storage.DeleteURLs(requestBody, h.auth.GetUserID())
 
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func (h *Handler) getStatistics(w http.ResponseWriter, r *http.Request) {
+	log.Println("Обработка запроса на получение статистики сервиса")
+
+	if h.trustedIpSubnet == nil {
+		log.Println("Доверенная IP-подсеть не задана")
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	realIp := net.ParseIP(r.Header.Get("X-Real-IP"))
+	if realIp == nil {
+		log.Println("Заголовок X-Real-IP не передан")
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	log.Println("Real IP:", realIp)
+
+	if !h.trustedIpSubnet.Contains(realIp) {
+		log.Println("IP клиента", realIp, "находится вне IP-подсети", h.trustedIpSubnet)
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	var response serviceStatistics
+	response.URLs, response.Users = h.storage.GetStatistics()
+
+	enc := json.NewEncoder(w)
+	err := enc.Encode(response)
+	if err != nil {
+		http.Error(w, "не удалось закодировать в JSON статистику сервиса", http.StatusInternalServerError)
+	}
 }
