@@ -223,8 +223,8 @@ func (s *MemoryStorage) DeleteURLs(shortURLs []string, user string) (deleted []s
 }
 
 func (s *MemoryStorage) delete(ctx context.Context, deletionBatch []string) error {
-	s.locker.Lock()
-	defer s.locker.Unlock()
+	//s.locker.Lock()
+	//defer s.locker.Unlock()
 
 	for _, shortURL := range deletionBatch {
 		mr := s.container[shortURL]
@@ -253,12 +253,10 @@ func deletionQueueProcess(ctx context.Context, d deleter, deletionQueue <-chan s
 			deletionBatch = append(deletionBatch, sh)
 
 			if len(deletionBatch) >= DeletionBatchSize {
-				go func() {
-					err := d.delete(ctx, deletionBatch)
-					if err != nil {
-						log.Println(err)
-					}
-				}()
+				err := d.delete(ctx, deletionBatch)
+				if err != nil {
+					log.Println(err)
+				}
 				deletionBatch = deletionBatch[:0]
 			}
 
@@ -269,12 +267,10 @@ func deletionQueueProcess(ctx context.Context, d deleter, deletionQueue <-chan s
 				continue
 			}
 
-			go func() {
-				err := d.delete(ctx, deletionBatch)
-				if err != nil {
-					log.Println(err)
-				}
-			}()
+			err := d.delete(ctx, deletionBatch)
+			if err != nil {
+				log.Println(err)
+			}
 			deletionBatch = deletionBatch[:0]
 		}
 	}
