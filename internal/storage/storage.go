@@ -276,7 +276,6 @@ func deletionQueueProcess(ctx context.Context, d deleter, deletionQueue <-chan s
 				}
 			}()
 			deletionBatch = deletionBatch[:0]
-			time.Sleep(time.Second)
 		}
 	}
 }
