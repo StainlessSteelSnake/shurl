@@ -1,11 +1,11 @@
-package grpc_server
+package grpcserv
 
 import (
 	"log"
 	"net"
 
 	"github.com/StainlessSteelSnake/shurl/internal/auth"
-	pb "github.com/StainlessSteelSnake/shurl/internal/grpc_server/proto"
+	pb "github.com/StainlessSteelSnake/shurl/internal/grpcserv/proto"
 	"github.com/StainlessSteelSnake/shurl/internal/storage"
 	"google.golang.org/grpc"
 )

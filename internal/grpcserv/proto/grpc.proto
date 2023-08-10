@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package grpc_server;
 
-option go_package = "github.com/StainlessSteelSnake/shurl/internal/grpc_server/proto";
+option go_package = "github.com/StainlessSteelSnake/shurl/internal/grpcserv/proto";
 
 message PostLongUrlRequest {
   string original_url = 1;
