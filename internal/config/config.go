@@ -12,21 +12,23 @@ import (
 )
 
 const (
-	defaultServerAddress   = "localhost:8080"
-	defaultBaseURL         = "http://" + defaultServerAddress + "/"
-	defaultFileStoragePath = "shurldb.txt"
-	defaultDatabaseDSN     = "postgresql://shurl_user:qazxswedc@localhost:5432/shurl"
+	defaultServerAddress     = "localhost:8080"
+	defaultBaseURL           = "http://" + defaultServerAddress + "/"
+	defaultFileStoragePath   = "shurldb.txt"
+	defaultDatabaseDSN       = "postgresql://shurl_user:qazxswedc@localhost:5432/shurl"
+	defaultGrpcServerAddress = "localhost:3200"
 )
 
 // Configuration содержит перечень настроек сервиса.
 type Configuration struct {
-	ServerAddress   string `env:"SERVER_ADDRESS" json:"server_address"`       // Адрес сервера приложения
-	BaseURL         string `env:"BASE_URL" json:"base_url"`                   // Корневой URL работающего сервиса
-	FileStoragePath string `env:"FILE_STORAGE_PATH" json:"file_storage_path"` // Путь к файлу для хранения данных сервиса
-	DatabaseDSN     string `env:"DATABASE_DSN" json:"database_dsn"`           // Строка для подключения к базе данных
-	EnableHTTPS     bool   `env:"ENABLE_HTTPS" json:"enable_https"`           // Признак "включить поддержку HTTPS"
-	ConfigFilePath  string `env:"CONFIG" json:"-"`                            // Путь к файлу с настройками сервиса
-	TrustedSubnet   string `env:"TRUSTED_SUBNET" json:"trusted_subnet"`       // IP-подсеть, из которой разрешены запросы статистики сервиса
+	ServerAddress     string `env:"SERVER_ADDRESS" json:"server_address"`           // Адрес HTTP-сервера приложения
+	BaseURL           string `env:"BASE_URL" json:"base_url"`                       // Корневой URL работающего сервиса
+	FileStoragePath   string `env:"FILE_STORAGE_PATH" json:"file_storage_path"`     // Путь к файлу для хранения данных сервиса
+	DatabaseDSN       string `env:"DATABASE_DSN" json:"database_dsn"`               // Строка для подключения к базе данных
+	EnableHTTPS       bool   `env:"ENABLE_HTTPS" json:"enable_https"`               // Признак "включить поддержку HTTPS"
+	ConfigFilePath    string `env:"CONFIG" json:"-"`                                // Путь к файлу с настройками сервиса
+	TrustedSubnet     string `env:"TRUSTED_SUBNET" json:"trusted_subnet"`           // IP-подсеть, из которой разрешены запросы статистики сервиса
+	GrpcServerAddress string `env:"GRPC_SERVER_ADDRESS" json:"grpc_server_address"` // Адрес gRPC-сервера приложения
 }
 
 // NewConfiguration создаёт перечень настроек сервиса.
@@ -51,6 +53,10 @@ func NewConfiguration() *Configuration {
 		cfg.ServerAddress = defaultServerAddress
 	}
 
+	if cfg.GrpcServerAddress == "" {
+		cfg.ServerAddress = defaultGrpcServerAddress
+	}
+
 	if cfg.BaseURL == "" {
 		cfg.BaseURL = defaultBaseURL
 	}
@@ -66,7 +72,8 @@ func NewConfiguration() *Configuration {
 }
 
 func (c *Configuration) fillFromFlags() {
-	flag.StringVar(&c.ServerAddress, "a", "", "string with server address")
+	flag.StringVar(&c.ServerAddress, "a", "", "string with HTTP-server address")
+	flag.StringVar(&c.GrpcServerAddress, "g", "", "string with gRPC-server address")
 	flag.StringVar(&c.BaseURL, "b", "", "string with base URL")
 	flag.StringVar(&c.FileStoragePath, "f", "", "string with file storage path")
 	flag.StringVar(&c.DatabaseDSN, "d", "", "string with database data source name")
@@ -111,6 +118,10 @@ func (c *Configuration) fillFromFile() error {
 
 	if tmpConfig.ServerAddress != "" && c.ServerAddress == "" {
 		c.ServerAddress = tmpConfig.ServerAddress
+	}
+
+	if tmpConfig.GrpcServerAddress != "" && c.GrpcServerAddress == "" {
+		c.GrpcServerAddress = tmpConfig.GrpcServerAddress
 	}
 
 	if tmpConfig.BaseURL != "" && c.BaseURL == "" {

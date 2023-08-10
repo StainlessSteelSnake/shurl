@@ -1,0 +1,89 @@
+syntax = "proto3";
+
+package grpc_server;
+
+option go_package = "github.com/StainlessSteelSnake/shurl/internal/grpc_server/proto";
+
+message PostLongUrlRequest {
+  string original_url = 1;
+}
+
+message PostLongUrlResponse {
+  string short_url = 1;
+  string token = 2;
+}
+
+message GetLongUrlRequest {
+  string short_url = 1;
+}
+
+message GetLongUrlResponse {
+  string original_url = 1;
+  string token = 2;
+}
+
+message PostLongUrlsRequest {
+  message PostLongUrlRequestRecord {
+    string correlation_id = 1;
+    string original_url = 2;
+  }
+
+  repeated PostLongUrlRequestRecord long_urls = 1;
+}
+
+message PostLongUrlsResponse {
+  message PostLongUrlResponseRecord {
+    string correlation_id = 1;
+    string short_url = 2;
+  }
+
+  repeated PostLongUrlResponseRecord short_urls = 1;
+  string token = 2;
+}
+
+message GetLongUrlsByUserRequest {
+}
+
+message GetLongUrlsByUserResponse {
+  message GetLongUrlsByUserResponseRecord {
+    string short_url = 1;
+    string original_url = 2;
+  }
+
+  repeated GetLongUrlsByUserResponseRecord urls = 1;
+  string token = 2;
+}
+
+message DeleteRequest {
+  repeated string short_urls = 1;
+}
+
+message DeleteResponse {
+  string token = 1;
+}
+
+message PingRequest {
+}
+
+message PingResponse {
+  string token = 1;
+}
+
+message StatsRequest {
+}
+
+message StatsResponse {
+  int32 urls = 1;
+  int32 users = 2;
+  string token = 3;
+}
+
+service ShurlService {
+  rpc PostLongUrl (PostLongUrlRequest) returns (PostLongUrlResponse) {}
+  rpc GetLongUrl (GetLongUrlRequest) returns (GetLongUrlResponse) {}
+  rpc PostLongUrls (PostLongUrlsRequest) returns (PostLongUrlsResponse) {}
+  rpc GetLongUrlsByUser (GetLongUrlsByUserRequest) returns (GetLongUrlsByUserResponse) {}
+  rpc Delete (DeleteRequest) returns (DeleteResponse) {}
+  rpc Ping (PingRequest) returns (PingResponse) {}
+  rpc Stats (StatsRequest) returns (StatsResponse) {}
+}

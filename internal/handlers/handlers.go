@@ -77,14 +77,14 @@ var baseURL string
 // NewHandler создаёт верхнеуровневый обработчик HTTP-запросов.
 // А также связывает его с хранилищем данных и обработчиком данных авторизации,
 // выстраивает цепочки обработки для разных типов запросов и запрашиваемых путей.
-func NewHandler(s storage.Storager, bURL string, trustedSubnet string) *Handler {
+func NewHandler(s storage.Storager, bURL string, auth auth.Authenticator, trustedSubnet string) *Handler {
 	baseURL = bURL
 	log.Println("Base URL:", baseURL)
 
 	handler := &Handler{
 		chi.NewMux(),
 		s,
-		auth.NewAuth(),
+		auth,
 		nil,
 	}
 
@@ -185,7 +185,7 @@ func (h *Handler) postLongURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	longURL := string(b)
-	log.Println("Пришедший в запросе исходный URL:", longURL)
+
 	if len(longURL) == 0 {
 		log.Println("Неверный формат URL")
 		http.Error(w, "неверный формат URL", http.StatusBadRequest)
