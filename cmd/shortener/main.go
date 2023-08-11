@@ -11,7 +11,6 @@ import (
 
 	"github.com/StainlessSteelSnake/shurl/internal/auth"
 	"github.com/StainlessSteelSnake/shurl/internal/config"
-	"github.com/StainlessSteelSnake/shurl/internal/grpcserv"
 	"github.com/StainlessSteelSnake/shurl/internal/handlers"
 	"github.com/StainlessSteelSnake/shurl/internal/server"
 	"github.com/StainlessSteelSnake/shurl/internal/storage"
@@ -77,7 +76,9 @@ func main() {
 
 	srv := server.NewServer(cfg.ServerAddress, h)
 
-	grpcServ, err := grpcserv.NewServer(cfg.GrpcServerAddress, cfg.BaseURL, store, authenticator)
+	/*
+		grpcServ, err := grpcserv.NewServer(cfg.GrpcServerAddress, cfg.BaseURL, store, authenticator)
+	*/
 
 	var canTerminate = make(chan struct{})
 	var signalChannel = make(chan os.Signal, 1)
@@ -93,7 +94,7 @@ func main() {
 			log.Fatalln("HTTP(S) server shutdown error:", err)
 		}
 
-		grpcServ.GracefulStop()
+		// grpcServ.GracefulStop()
 
 		deletionCancel()
 
