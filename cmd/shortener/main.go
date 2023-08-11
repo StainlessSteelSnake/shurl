@@ -100,7 +100,7 @@ func main() {
 		if grpcServ != nil {
 			grpcServ.GracefulStop()
 		}
-		
+
 		deletionCancel()
 
 		close(canTerminate)
