@@ -27,7 +27,6 @@ func NewServer(host string, baseURL string, storage storage.Storager, auth auth.
 	// определяем порт для сервера
 	listener, err := net.Listen("tcp", host)
 	if err != nil {
-		log.Fatalln("Ошибка при открытии tcp-канала", host, "для gRPC-сервера:", err)
 		return nil, err
 	}
 

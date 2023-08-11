@@ -78,6 +78,10 @@ func main() {
 	srv := server.NewServer(cfg.ServerAddress, h)
 
 	grpcServ, err := grpcserv.NewServer(cfg.GrpcServerAddress, cfg.BaseURL, store, authenticator)
+	if err != nil {
+		log.Fatalln("Ошибка при открытии tcp-канала", cfg.GrpcServerAddress, "для gRPC-сервера:", err)
+		grpcServ = nil
+	}
 
 	var canTerminate = make(chan struct{})
 	var signalChannel = make(chan os.Signal, 1)
@@ -93,8 +97,10 @@ func main() {
 			log.Fatalln("HTTP(S) server shutdown error:", err)
 		}
 
-		grpcServ.GracefulStop()
-
+		if grpcServ != nil {
+			grpcServ.GracefulStop()
+		}
+		
 		deletionCancel()
 
 		close(canTerminate)
