@@ -54,7 +54,7 @@ func NewConfiguration() *Configuration {
 	}
 
 	if cfg.GrpcServerAddress == "" {
-		cfg.ServerAddress = defaultGrpcServerAddress
+		cfg.GrpcServerAddress = defaultGrpcServerAddress
 	}
 
 	if cfg.BaseURL == "" {
