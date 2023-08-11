@@ -78,7 +78,7 @@ func main() {
 	srv := server.NewServer(cfg.ServerAddress, h)
 
 	grpcServ, err := grpcserv.NewServer(cfg.GrpcServerAddress, cfg.BaseURL, store, authenticator)
-	
+
 	var canTerminate = make(chan struct{})
 	var signalChannel = make(chan os.Signal, 1)
 	signal.Notify(signalChannel, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)

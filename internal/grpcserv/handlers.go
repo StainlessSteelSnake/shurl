@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"strings"
 
 	pb "github.com/StainlessSteelSnake/shurl/internal/grpcserv/proto"
 	"github.com/StainlessSteelSnake/shurl/internal/storage"
@@ -21,7 +22,7 @@ func (s *grpcServer) PostLongUrl(ctx context.Context, req *pb.PostLongUrlRequest
 
 	longURL := req.OriginalUrl
 
-	var response = pb.PostLongUrlResponse{}
+	var response = pb.PostLongUrlResponse{Token: s.auth.GetTokenID()}
 
 	shortURL, err := s.storage.AddURL(longURL, s.auth.GetUserID())
 	if err != nil && errors.Is(err, storage.DBError{LongURL: longURL, Duplicate: false, Err: nil}) {
@@ -47,19 +48,97 @@ func (s *grpcServer) PostLongUrl(ctx context.Context, req *pb.PostLongUrlRequest
 }
 
 func (s *grpcServer) GetLongUrl(ctx context.Context, req *pb.GetLongUrlRequest) (*pb.GetLongUrlResponse, error) {
-	return nil, nil
+	var response = pb.GetLongUrlResponse{Token: s.auth.GetTokenID()}
+
+	shortUrl := req.ShortUrl
+	log.Println("Идентификатор короткого URL, полученный из gRPC-запроса:", shortUrl)
+
+	result, err := s.storage.FindURL(shortUrl)
+	if err != nil {
+		log.Println("Ошибка '", err, "'. Не найден URL с указанным коротким идентификатором:", shortUrl)
+		return nil, status.Error(codes.NotFound, "URL с указанным коротким идентификатором не найден")
+	}
+
+	if result.Deleted {
+		log.Println("URL", result.LongURL, "для короткого идентификатора", shortUrl, "был удалён")
+		return nil, status.Error(codes.Unavailable, "URL с указанным коротким идентификатором не найден")
+	}
+
+	log.Println("Найден URL", result.LongURL, "для короткого идентификатора", shortUrl)
+	response.OriginalUrl = result.LongURL
+
+	return &response, nil
 }
 
 func (s *grpcServer) PostLongUrls(ctx context.Context, req *pb.PostLongUrlsRequest) (*pb.PostLongUrlsResponse, error) {
-	return nil, nil
+	var response = pb.PostLongUrlsResponse{Token: s.auth.GetTokenID()}
+
+	var longUrls = make(storage.BatchURLs, 0, len(req.LongUrls))
+	for _, longUrl := range req.LongUrls {
+		longUrls = append(longUrls, storage.RecordURL{ID: longUrl.CorrelationId, URL: longUrl.OriginalUrl})
+	}
+
+	shortUrls, err := s.storage.AddURLs(longUrls, s.auth.GetUserID())
+	if err != nil {
+		log.Println("Ошибка '", err, "' при добавлении в БД URLs:", longUrls)
+		return nil, status.Error(codes.Internal, "ошибка при добавлении в БД URLs: "+err.Error())
+	}
+
+	response.ShortUrls = make([]*pb.PostLongUrlsResponse_PostLongUrlResponseRecord, len(shortUrls))
+	for _, shortUrl := range shortUrls {
+		response.ShortUrls = append(response.ShortUrls, &pb.PostLongUrlsResponse_PostLongUrlResponseRecord{
+			CorrelationId: shortUrl.ID,
+			ShortUrl:      s.baseURL + shortUrl.URL,
+		})
+	}
+
+	return &response, nil
 }
 
 func (s *grpcServer) GetLongUrlsByUser(ctx context.Context, req *pb.GetLongUrlsByUserRequest) (*pb.GetLongUrlsByUserResponse, error) {
-	return nil, nil
+	var response = pb.GetLongUrlsByUserResponse{Token: s.auth.GetTokenID()}
+
+	urls := s.storage.GetURLsByUser(s.auth.GetUserID())
+	if len(urls) == 0 {
+		log.Println("Для пользователя с идентификатором '" + s.auth.GetUserID() + "' не найдены сохранённые URL")
+		return &response, nil
+	}
+	log.Println("Для пользователя с идентификатором '"+s.auth.GetUserID()+"' найдено ", len(urls), "сохранённых URL:")
+
+	for i, shortURL := range urls {
+		result, err := s.storage.FindURL(shortURL)
+		if err != nil {
+			continue
+		}
+
+		record := pb.GetLongUrlsByUserResponse_GetLongUrlsByUserResponseRecord{
+			ShortUrl:    s.baseURL + shortURL,
+			OriginalUrl: result.LongURL,
+		}
+		log.Println("Запись", i, "короткий URL", record.ShortUrl, "длинный URL", record.OriginalUrl)
+		response.Urls = append(response.Urls, &record)
+	}
+
+	return &response, nil
 }
 
 func (s *grpcServer) Delete(ctx context.Context, req *pb.DeleteRequest) (*pb.DeleteResponse, error) {
-	return nil, nil
+	var response = pb.DeleteResponse{Token: s.auth.GetTokenID()}
+
+	log.Println("Тело запроса на удаление данных:\n", req.ShortUrls)
+	if len(req.ShortUrls) == 0 {
+		log.Println("Пустой список идентификаторов URL")
+		return nil, status.Error(codes.InvalidArgument, "пустой список идентификаторов URL")
+	}
+
+	for i, record := range req.ShortUrls {
+		req.ShortUrls[i] = strings.Replace(record, s.baseURL, "", -1)
+	}
+	log.Println("Список подлежащих удалению коротких идентификаторов URL:\n", req.ShortUrls)
+
+	_ = s.storage.DeleteURLs(req.ShortUrls, s.auth.GetUserID())
+
+	return &response, nil
 }
 
 func (s *grpcServer) Ping(ctx context.Context, req *pb.PingRequest) (*pb.PingResponse, error) {
@@ -74,11 +153,10 @@ func (s *grpcServer) Ping(ctx context.Context, req *pb.PingRequest) (*pb.PingRes
 }
 
 func (s *grpcServer) Stats(ctx context.Context, req *pb.StatsRequest) (*pb.StatsResponse, error) {
-	var response pb.StatsResponse
+	var response = pb.StatsResponse{Token: s.auth.GetTokenID()}
 
 	urls, users := s.storage.GetStatistics()
 	response.Urls, response.Users = int32(urls), int32(users)
-	response.Token = s.auth.GetTokenID()
 
 	return &response, nil
 }
