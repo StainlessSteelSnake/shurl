@@ -100,29 +100,27 @@ func main() {
 		close(canTerminate)
 	}()
 
-	go func() {
-		if cfg.EnableHTTPS {
-			manager := &autocert.Manager{
-				Cache:      autocert.DirCache("cache-dir"),
-				Prompt:     autocert.AcceptTOS,
-				HostPolicy: autocert.HostWhitelist("localhost", cfg.ServerAddress),
-			}
-
-			srv.TLSConfig = manager.TLSConfig()
-
-			log.Println("Запуск HTTP-сервера с поддержкой TLS")
-			err = srv.ListenAndServeTLS("", "")
-			if err != nil && err != http.ErrServerClosed {
-				log.Fatalln("HTTPS server ListenAndServeTLS:", err)
-			}
-		} else {
-			log.Println("Запуск HTTP-сервера")
-			err = srv.ListenAndServe()
-			if err != nil && err != http.ErrServerClosed {
-				log.Fatalln("HTTP server ListenAndServe:", err)
-			}
+	if cfg.EnableHTTPS {
+		manager := &autocert.Manager{
+			Cache:      autocert.DirCache("cache-dir"),
+			Prompt:     autocert.AcceptTOS,
+			HostPolicy: autocert.HostWhitelist("localhost", cfg.ServerAddress),
 		}
-	}()
+
+		srv.TLSConfig = manager.TLSConfig()
+
+		log.Println("Запуск HTTP-сервера с поддержкой TLS")
+		err = srv.ListenAndServeTLS("", "")
+		if err != nil && err != http.ErrServerClosed {
+			log.Fatalln("HTTPS server ListenAndServeTLS:", err)
+		}
+	} else {
+		log.Println("Запуск HTTP-сервера")
+		err = srv.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
+			log.Fatalln("HTTP server ListenAndServe:", err)
+		}
+	}
 
 	<-canTerminate
 	log.Println("Terminating the server.")
