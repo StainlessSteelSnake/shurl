@@ -17,6 +17,7 @@ type grpcServer struct {
 	baseURL string
 }
 
+// NewServer создаёт и запускает в отдельном потоке экземпляр gRPC-сервера.
 func NewServer(host string, baseURL string, storage storage.Storager, auth auth.Authenticator) (*grpc.Server, error) {
 	server := grpcServer{
 		storage: storage,

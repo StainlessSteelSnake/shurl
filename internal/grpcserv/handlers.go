@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// PostLongUrl обрабатывает gRPC-запрос на сокращение URL, возвращает короткий URL.
 func (s *grpcServer) PostLongUrl(ctx context.Context, req *pb.PostLongUrlRequest) (*pb.PostLongUrlResponse, error) {
 	log.Println("Пришедший в запросе исходный URL:", req.OriginalUrl)
 
@@ -47,6 +48,7 @@ func (s *grpcServer) PostLongUrl(ctx context.Context, req *pb.PostLongUrlRequest
 	return &response, resultError
 }
 
+// GetLongUrl обрабатывает gRPC-запрос на восстановление исходного URL по переданному короткому URL.
 func (s *grpcServer) GetLongUrl(ctx context.Context, req *pb.GetLongUrlRequest) (*pb.GetLongUrlResponse, error) {
 	var response = pb.GetLongUrlResponse{Token: s.auth.GetTokenID()}
 
@@ -70,6 +72,7 @@ func (s *grpcServer) GetLongUrl(ctx context.Context, req *pb.GetLongUrlRequest) 
 	return &response, nil
 }
 
+// PostLongUrls обрабатывает gRPC-запрос на сокращение переданных URL, возвращает список коротких URL.
 func (s *grpcServer) PostLongUrls(ctx context.Context, req *pb.PostLongUrlsRequest) (*pb.PostLongUrlsResponse, error) {
 	var response = pb.PostLongUrlsResponse{Token: s.auth.GetTokenID()}
 
@@ -95,6 +98,7 @@ func (s *grpcServer) PostLongUrls(ctx context.Context, req *pb.PostLongUrlsReque
 	return &response, nil
 }
 
+// GetLongUrlsByUser обрабатывает gRPC-запрос на получение списка всех сокращённых и исходных URL для текущего пользователя.
 func (s *grpcServer) GetLongUrlsByUser(ctx context.Context, req *pb.GetLongUrlsByUserRequest) (*pb.GetLongUrlsByUserResponse, error) {
 	var response = pb.GetLongUrlsByUserResponse{Token: s.auth.GetTokenID()}
 
@@ -122,6 +126,7 @@ func (s *grpcServer) GetLongUrlsByUser(ctx context.Context, req *pb.GetLongUrlsB
 	return &response, nil
 }
 
+// Delete обрабатывает gRPC-запрос на удаление переданных URL.
 func (s *grpcServer) Delete(ctx context.Context, req *pb.DeleteRequest) (*pb.DeleteResponse, error) {
 	var response = pb.DeleteResponse{Token: s.auth.GetTokenID()}
 
@@ -141,6 +146,7 @@ func (s *grpcServer) Delete(ctx context.Context, req *pb.DeleteRequest) (*pb.Del
 	return &response, nil
 }
 
+// Ping обрабатывает gRPC-запрос на проверку подключения к хранилищу сокращённых URL.
 func (s *grpcServer) Ping(ctx context.Context, req *pb.PingRequest) (*pb.PingResponse, error) {
 	err := s.storage.Ping()
 	if err != nil {
@@ -152,6 +158,7 @@ func (s *grpcServer) Ping(ctx context.Context, req *pb.PingRequest) (*pb.PingRes
 	return &pb.PingResponse{Token: s.auth.GetTokenID()}, nil
 }
 
+// Stats обрабатывает gRPC-запрос на получение статистики сервиса: количества URL и пользователей.
 func (s *grpcServer) Stats(ctx context.Context, req *pb.StatsRequest) (*pb.StatsResponse, error) {
 	var response = pb.StatsResponse{Token: s.auth.GetTokenID()}
 
