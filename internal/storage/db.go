@@ -26,9 +26,14 @@ type (
 
 	// DBError описывает структуру данных об ошибке при взаимодействии с хранилищем в БД.
 	DBError struct {
-		LongURL   string // Исходный длинный URL
-		Duplicate bool   // Признак "найден дубликат"
-		Err       error  // Сообщение об ошибке
+		LongURL string // Исходный длинный URL
+		Err     error  // Сообщение об ошибке
+	}
+
+	// DBDuplicateError описывает структуру данных об ошибке при попытке добавления дублирующейся записи в БД.
+	DBDuplicateError struct {
+		LongURL string // Исходный длинный URL
+		Err     error  // Сообщение об ошибке
 	}
 )
 
@@ -128,29 +133,27 @@ func (s *DatabaseStorage) init(ctx context.Context) error {
 
 // Error выдаёт текст сообщения об ошибке при взаимодействии с хранилищем в БД.
 func (e DBError) Error() string {
+	return fmt.Sprintf("Ошибка добавления полного URL %v в БД: %v", e.LongURL, e.Err)
+}
+
+// Error выдаёт текст сообщения об ошибке при попытке добавления дублирующейся записи в БД.
+func (e DBDuplicateError) Error() string {
 	return fmt.Sprintf("Найден дубликат для полного URL: %v. Ошибка добавления в БД: %v", e.LongURL, e.Err)
 }
 
-// Is сравнивает произвольные данные об ошибке с типом данных об ошибке при взаимодействии с хранилищем в БД.
-func (e DBError) Is(target error) bool {
-	err, ok := target.(DBError)
-	if !ok {
-		return false
+// NewStorageDBError создаёт данные об ошибке при взаимодействии с хранилищем в БД.
+func NewStorageDBError(longURL string, err error) error {
+	return &DBError{
+		LongURL: longURL,
+		Err:     err,
 	}
-
-	if err.LongURL != e.LongURL || err.Duplicate != e.Duplicate {
-		return false
-	}
-
-	return true
 }
 
-// NewStorageDBError создаёт данные об ошибке при взаимодействии с хранилищем в БД.
-func NewStorageDBError(longURL string, duplicate bool, err error) error {
-	return &DBError{
-		LongURL:   longURL,
-		Duplicate: duplicate,
-		Err:       err,
+// NewStorageDBDuplicateError создаёт данные об ошибке при попытке добавления дублирующейся записи в БД.
+func NewStorageDBDuplicateError(longURL string, err error) error {
+	return &DBDuplicateError{
+		LongURL: longURL,
+		Err:     err,
 	}
 }
 
@@ -179,12 +182,12 @@ func (s *DatabaseStorage) AddURL(l, user string) (string, error) {
 
 	if err != nil {
 		log.Println("Ошибка операции с БД, код:", pgErr.Code, ", сообщение:", pgErr.Error())
-		duplicateErr := NewStorageDBError(l, true, err)
+		duplicateErr := NewStorageDBDuplicateError(l, err)
 
 		r := s.conn.QueryRow(ctx, querySelectByLongURL, l)
 		err = r.Scan(&sh)
 		if err != nil {
-			return "", NewStorageDBError(l, false, err)
+			return "", NewStorageDBError(l, err)
 		}
 
 		log.Println("Найдена ранее сохранённая запись")

@@ -123,10 +123,6 @@ func (a *authentication) authExisting(cookie string) error {
 // Затем передаёт запрос следующему обработчику в цепочке.
 func (a *authentication) Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if a == nil {
-			return
-		}
-
 		a.userID = ""
 		a.cookieFull = ""
 
@@ -162,11 +158,6 @@ func (a *authentication) Authenticate(next http.Handler) http.Handler {
 // Authenticate обрабатывает gRPC-запрос на авторизацию пользователя.
 // Затем передаёт запрос следующему обработчику в цепочке.
 func (a *authentication) GrpcAuthenticate(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-	if a == nil {
-		err := status.Error(codes.Internal, "Ошибка вызова функции аутентификации")
-		return nil, err
-	}
-
 	a.userID = ""
 	a.cookieFull = ""
 

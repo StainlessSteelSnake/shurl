@@ -26,13 +26,15 @@ func (s *grpcServer) PostLongUrl(ctx context.Context, req *pb.PostLongUrlRequest
 	var response = pb.PostLongUrlResponse{Token: s.auth.GetTokenID()}
 
 	shortURL, err := s.storage.AddURL(longURL, s.auth.GetUserID())
-	if err != nil && errors.Is(err, storage.DBError{LongURL: longURL, Duplicate: false, Err: nil}) {
-		log.Println("Ошибка '", err, "' при добавлении в БД URL:", longURL)
+	var dbError = new(storage.DBError)
+	if err != nil && errors.Is(err, dbError) {
+		log.Println("Ошибка '", err, "' при добxавлении в БД URL:", longURL)
 		return nil, status.Errorf(codes.Internal, "ошибка при добавлении в БД: "+err.Error())
 	}
 
 	var resultError error
-	if err != nil && errors.Is(err, storage.DBError{LongURL: longURL, Duplicate: true, Err: nil}) {
+	var dbDuplicateError = new(storage.DBDuplicateError)
+	if err != nil && errors.Is(err, dbDuplicateError) {
 		log.Println("Найденный короткий идентификатор URL:", shortURL)
 		resultError = status.Error(codes.AlreadyExists, "Найденный короткий идентификатор URL:"+shortURL)
 	} else if err != nil {

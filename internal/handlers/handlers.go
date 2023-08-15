@@ -194,13 +194,15 @@ func (h *Handler) postLongURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	shortURL, err := h.storage.AddURL(longURL, h.auth.GetUserID())
-	if err != nil && errors.Is(err, storage.DBError{LongURL: longURL, Duplicate: false, Err: nil}) {
+	var dbError = new(storage.DBError)
+	if err != nil && errors.Is(err, dbError) {
 		log.Println("Ошибка '", err, "' при добавлении в БД URL:", longURL)
 		http.Error(w, "ошибка при добавлении в БД: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err != nil && errors.Is(err, storage.DBError{LongURL: longURL, Duplicate: true, Err: nil}) {
+	var dbDuplicateError = new(storage.DBDuplicateError)
+	if err != nil && errors.Is(err, dbDuplicateError) {
 		log.Println("Найденный короткий идентификатор URL:", shortURL)
 		w.WriteHeader(http.StatusConflict)
 		err = nil
