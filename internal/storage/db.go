@@ -32,7 +32,10 @@ type (
 	}
 )
 
+// DBErrorDublicate содержит типовую ошибку при добавлении дублирующейся записи.
 var DBErrorDublicate = NewStorageDBError("", true, nil)
+
+// DBErrorUnknown содержит типовую ошибку при взаимодействии с БД.
 var DBErrorUnknown = NewStorageDBError("", false, nil)
 
 // DeletionQueueProcess обрабатывает очередь запросов на удаление, вызывая обработчик каждой записи в отдельном потоке.
