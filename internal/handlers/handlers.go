@@ -194,15 +194,13 @@ func (h *Handler) postLongURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	shortURL, err := h.storage.AddURL(longURL, h.auth.GetUserID())
-	var dbError = new(storage.DBError)
-	if err != nil && errors.Is(err, dbError) {
+	if err != nil && errors.Is(err, storage.DBErrorUnknown) {
 		log.Println("Ошибка '", err, "' при добавлении в БД URL:", longURL)
 		http.Error(w, "ошибка при добавлении в БД: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	var dbDuplicateError = new(storage.DBDuplicateError)
-	if err != nil && errors.Is(err, dbDuplicateError) {
+	if err != nil && errors.Is(err, storage.DBErrorDublicate) {
 		log.Println("Найденный короткий идентификатор URL:", shortURL)
 		w.WriteHeader(http.StatusConflict)
 		err = nil
@@ -245,14 +243,19 @@ func (h *Handler) postLongURLinJSON(w http.ResponseWriter, r *http.Request) {
 
 	var duplicateFound bool
 	shortURL, err := h.storage.AddURL(requestBody.URL, h.auth.GetUserID())
-	if err != nil && errors.Is(err, storage.DBError{LongURL: requestBody.URL, Err: nil}) {
+	if err != nil && errors.Is(err, storage.DBErrorUnknown) {
 		log.Println("Ошибка '", err, "' при добавлении в БД URL:", requestBody.URL)
 		http.Error(w, "ошибка при добавлении в БД: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err != nil {
+	if err != nil && errors.Is(err, storage.DBErrorDublicate) {
 		duplicateFound = true
+	} else if err != nil {
+		log.Println("Ошибка '", err, "' при добавлении в БД URL:", requestBody.URL)
+		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, "ошибка при при формировании ответа: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	log.Println("Созданный короткий идентификатор URL:", shortURL)
