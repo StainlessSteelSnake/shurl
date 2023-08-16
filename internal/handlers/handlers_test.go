@@ -36,6 +36,10 @@ func (s *dummyStorage) GetURLsByUser(u string) []string {
 	return s.usersURLs[u]
 }
 
+func (s *dummyStorage) GetStatistics() (int, int) {
+	return 1, 1
+}
+
 func (s *dummyStorage) Ping() error {
 	return nil
 }
@@ -148,7 +152,7 @@ func BenchmarkNewHandler(b *testing.B) {
 		for _, tt := range tests {
 			b.Run(tt.name, func(b *testing.B) {
 				s := &dummyStorage{tt.storage, tt.user}
-				h := NewHandler(s, tt.baseURL)
+				h := NewHandler(s, tt.baseURL, auth.NewAuth(), "")
 
 				request := httptest.NewRequest(tt.method, tt.request, nil)
 				writer := httptest.NewRecorder()
@@ -210,7 +214,7 @@ func TestNewHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &dummyStorage{tt.storage, tt.user}
-			h := NewHandler(s, tt.baseURL)
+			h := NewHandler(s, tt.baseURL, auth.NewAuth(), "")
 
 			request := httptest.NewRequest(tt.method, tt.request, nil)
 			writer := httptest.NewRecorder()

@@ -9,7 +9,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/StainlessSteelSnake/shurl/internal/auth"
 	"github.com/StainlessSteelSnake/shurl/internal/config"
+	"github.com/StainlessSteelSnake/shurl/internal/grpcserv"
 	"github.com/StainlessSteelSnake/shurl/internal/handlers"
 	"github.com/StainlessSteelSnake/shurl/internal/server"
 	"github.com/StainlessSteelSnake/shurl/internal/storage"
@@ -50,32 +52,36 @@ func main() {
 	ctx := context.Background()
 
 	var h *handlers.Handler
+	var store storage.Storager
 
 	deletionContext, deletionCancel := context.WithCancel(ctx)
+
 	if cfg.DatabaseDSN != "" {
-		dStorage := storage.NewDBStorage(ctx, storage.NewMemoryStorage(), cfg.DatabaseDSN)
-		dStorage.DeletionCancel = deletionCancel
-		dStorage.DeletionQueueProcess(deletionContext)
-		defer dStorage.CloseFunc()
+		dbStore := storage.NewDBStorage(ctx, storage.NewMemoryStorage(), cfg.DatabaseDSN)
+		dbStore.DeletionCancel = deletionCancel
+		dbStore.DeletionQueueProcess(deletionContext)
+		store = dbStore
 
-		h = handlers.NewHandler(dStorage, cfg.BaseURL)
 	} else {
-		dStorage := storage.NewMemoryStorage()
-		dStorage.DeletionCancel = deletionCancel
-		dStorage.DeletionQueueProcess(deletionContext)
-		defer dStorage.CloseFunc()
-
-		h = handlers.NewHandler(dStorage, cfg.BaseURL)
+		mStore := storage.NewMemoryStorage()
+		mStore.DeletionCancel = deletionCancel
+		mStore.DeletionQueueProcess(deletionContext)
+		store = mStore
 	}
 
-	/*str := storage.NewStorage(ctx, cfg.FileStoragePath, cfg.DatabaseDSN)
-	if closeFunc := str.CloseFunc(); closeFunc != nil {
-		defer closeFunc()
-	}
-	h := handlers.NewHandler(str, cfg.BaseURL)
-	*/
+	defer store.CloseFunc()
+
+	authenticator := auth.NewAuth()
+
+	h = handlers.NewHandler(store, cfg.BaseURL, authenticator, cfg.TrustedSubnet)
 
 	srv := server.NewServer(cfg.ServerAddress, h)
+
+	grpcServ, err := grpcserv.NewServer(cfg.GrpcServerAddress, cfg.BaseURL, store, authenticator)
+	if err != nil {
+		log.Fatalln("Ошибка при открытии tcp-канала", cfg.GrpcServerAddress, "для gRPC-сервера:", err)
+		grpcServ = nil
+	}
 
 	var canTerminate = make(chan struct{})
 	var signalChannel = make(chan os.Signal, 1)
@@ -89,6 +95,10 @@ func main() {
 		err := srv.Shutdown(ctx)
 		if err != nil {
 			log.Fatalln("HTTP(S) server shutdown error:", err)
+		}
+
+		if grpcServ != nil {
+			grpcServ.GracefulStop()
 		}
 
 		deletionCancel()
@@ -105,11 +115,13 @@ func main() {
 
 		srv.TLSConfig = manager.TLSConfig()
 
+		log.Println("Запуск HTTP-сервера с поддержкой TLS")
 		err = srv.ListenAndServeTLS("", "")
 		if err != nil && err != http.ErrServerClosed {
 			log.Fatalln("HTTPS server ListenAndServeTLS:", err)
 		}
 	} else {
+		log.Println("Запуск HTTP-сервера")
 		err = srv.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
 			log.Fatalln("HTTP server ListenAndServe:", err)

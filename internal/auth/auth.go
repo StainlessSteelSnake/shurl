@@ -2,6 +2,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -9,6 +10,11 @@ import (
 	"errors"
 	"log"
 	"net/http"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -30,8 +36,12 @@ type (
 	Authenticator interface {
 		// Обработка HTTP-запроса и авторизация пользователя
 		Authenticate(http.Handler) http.Handler
+		// Обработка gRPC-запроса и авторизация пользователя
+		GrpcAuthenticate(context.Context, interface{}, *grpc.UnaryServerInfo, grpc.UnaryHandler) (interface{}, error)
 		// Получение идентификатора авторизованного пользователя
 		GetUserID() string
+		// Получение токена авторизованного пользователя
+		GetTokenID() string
 	}
 )
 
@@ -113,10 +123,6 @@ func (a *authentication) authExisting(cookie string) error {
 // Затем передаёт запрос следующему обработчику в цепочке.
 func (a *authentication) Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if a == nil {
-			return
-		}
-
 		a.userID = ""
 		a.cookieFull = ""
 
@@ -149,9 +155,52 @@ func (a *authentication) Authenticate(next http.Handler) http.Handler {
 	})
 }
 
+// Authenticate обрабатывает gRPC-запрос на авторизацию пользователя.
+// Затем передаёт запрос следующему обработчику в цепочке.
+func (a *authentication) GrpcAuthenticate(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	a.userID = ""
+	a.cookieFull = ""
+
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		log.Println("Метаданные '" + cookieAuthentication + "' не переданы")
+	}
+
+	tokens := md.Get(cookieAuthentication)
+	if len(tokens) == 0 {
+		log.Println("Метаданные '" + cookieAuthentication + "' не переданы")
+	} else {
+		err := a.authExisting(tokens[0])
+		if err != nil {
+			log.Println("Ошибка при аутентификации пользователя через метаданные 'authentication':", err)
+		}
+	}
+
+	if a.cookieFull == "" {
+		err := a.authNew()
+		if err != nil {
+			log.Println("Ошибка при создании ID пользователя:", err)
+		}
+	}
+
+	if a.cookieFull == "" {
+		err := status.Error(codes.Unauthenticated, "Ошибка при аутентификации пользователя")
+		return nil, err
+	}
+
+	md.Set(cookieAuthentication, a.cookieFull)
+
+	return handler(ctx, req)
+}
+
 // GetUserID возвращает идентификатор авторизованного пользователя.
 func (a *authentication) GetUserID() string {
 	return a.userID
+}
+
+// GetUserToken возвращает токен авторизованного пользователя.
+func (a *authentication) GetTokenID() string {
+	return a.cookieFull
 }
 
 // getSign создаёт подпись для переданного идентификатора пользователя

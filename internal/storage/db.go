@@ -27,10 +27,16 @@ type (
 	// DBError описывает структуру данных об ошибке при взаимодействии с хранилищем в БД.
 	DBError struct {
 		LongURL   string // Исходный длинный URL
-		Duplicate bool   // Признак "найден дубликат"
+		Duplicate bool   // Признак дублирующейся ошибки
 		Err       error  // Сообщение об ошибке
 	}
 )
+
+// DBErrorDublicate содержит типовую ошибку при добавлении дублирующейся записи.
+var DBErrorDublicate = NewStorageDBError("", true, nil)
+
+// DBErrorUnknown содержит типовую ошибку при взаимодействии с БД.
+var DBErrorUnknown = NewStorageDBError("", false, nil)
 
 // DeletionQueueProcess обрабатывает очередь запросов на удаление, вызывая обработчик каждой записи в отдельном потоке.
 func (s *DatabaseStorage) DeletionQueueProcess(ctx context.Context) {
@@ -127,18 +133,22 @@ func (s *DatabaseStorage) init(ctx context.Context) error {
 }
 
 // Error выдаёт текст сообщения об ошибке при взаимодействии с хранилищем в БД.
-func (e DBError) Error() string {
-	return fmt.Sprintf("Найден дубликат для полного URL: %v. Ошибка добавления в БД: %v", e.LongURL, e.Err)
+func (e *DBError) Error() string {
+	if e.Duplicate {
+		return fmt.Sprintf("Найден дубликат для полного URL: %v. Ошибка добавления в БД: %v", e.LongURL, e.Err)
+	}
+
+	return fmt.Sprintf("Ошибка добавления полного URL %v в БД: %v", e.LongURL, e.Err)
 }
 
 // Is сравнивает произвольные данные об ошибке с типом данных об ошибке при взаимодействии с хранилищем в БД.
-func (e DBError) Is(target error) bool {
-	err, ok := target.(DBError)
+func (e *DBError) Is(target error) bool {
+	err, ok := target.(*DBError)
 	if !ok {
 		return false
 	}
 
-	if err.LongURL != e.LongURL || err.Duplicate != e.Duplicate {
+	if err.Duplicate != e.Duplicate {
 		return false
 	}
 

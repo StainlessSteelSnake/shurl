@@ -38,6 +38,7 @@ type (
 		FindURL(string) (MemoryRecord, error)         // Поиск длинного URL в хранилище по его сокращённому варианту.
 		GetURLsByUser(string) []string                // Поиск в хранилище всех URL, добавленных текущим пользователем.
 		DeleteURLs([]string, string) []string         // Удаление из хранилища списка URL.
+		GetStatistics() (urls int, users int)         // Статистика сервиса: количество сокращённых URL и количество пользователей.
 		CloseFunc() func()                            // Закрытие соединения с хранилищем (для файла или БД).
 		Ping() error                                  // Проверка установки соединения с БД.
 	}
@@ -179,6 +180,13 @@ func (s *MemoryStorage) GetURLsByUser(u string) []string {
 	defer s.locker.RUnlock()
 
 	return s.usersURLs[u]
+}
+
+// GetStatistics возвращает статистику сервиса: количество сокращённых URL и количество пользователей.
+func (s *MemoryStorage) GetStatistics() (urls int, users int) {
+	urls = len(s.container)
+	users = len(s.usersURLs)
+	return
 }
 
 // CloseFunc не возвращает никакую функцию, поскольку соединение с БД не устанавливается для хранилища в памяти.
